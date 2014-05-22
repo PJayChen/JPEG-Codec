@@ -3,8 +3,101 @@
 #include <string.h>
 
 #define abs(x) ( ( (x) < 0)? -(x):(x) )
+#define ARRAY 0
+#define BLOCK 1
+#define STRING 2
 
-int myIntRound(float dInput)
+class JPEGimage{
+public:
+  
+  int Compress(int f[8][8],int DCcomp, char* code);
+  void printData(int type, const char *name, const void*data);
+
+  JPEGimage()
+  {
+
+  }
+
+  ~JPEGimage()
+  {
+
+  }
+private:
+  int myIntRound(float dInput);
+  float C(int u);
+  void DCT(int f[8][8],int F[8][8]);
+  void Quantize(int F[8][8], int QF[8][8]);
+  void ZigZag(int QF[8][8],int ZZ[64]);
+  int RLE(int ZZ[64],int RL[64]);
+  int getCat(int a);
+  void getDCcode(int a,int& lenb,char *size_value);
+  void getACcode(int n,int a, int& lenb, char* b);
+  void Encode(int RL[64], int rl, char* output);
+
+};
+
+void JPEGimage::printData(int type, const char *name, const void *data)
+{
+    int i,j;
+
+    printf("%s:\n", name);
+    
+    if(type == BLOCK){
+      int *block_data = (int *)data;
+      for(i=0;i<8;i++){
+        for(j=0;j<8;j++){
+          printf("%4d, ", *(block_data + j + i*8));
+        }
+        printf("\n");
+      } 
+    }
+    else if(type == ARRAY){
+      int *array_data = (int *)data;
+      for(j=0;j<64;j++){
+        printf("%2d, ", array_data[j]);
+      }
+      printf("\n");
+    }
+    else if(type == STRING){
+      char *string_data = (char *) data;
+      printf("%s\n", string_data);
+    }
+    
+    printf("\n");
+}
+
+int JPEGimage::Compress(int f[8][8],int DCcomp, char* code)
+{
+  
+  printData(BLOCK, "Block", (int*)f);
+
+  int F[8][8];
+  DCT(f,F); 
+  printData(BLOCK, "DCT", (int*)F);
+
+  int QF[8][8];
+  Quantize(F,QF);
+  printData(BLOCK, "Quantize", (int*)QF);
+  
+
+  int newDC = QF[0][0];
+  QF[0][0] -= DCcomp;
+
+  int ZZ[64] = {0};
+  ZigZag(QF,ZZ);
+  printData(ARRAY, "ZigZag", ZZ);
+
+  int RL[64] = {0};
+  int rl;
+  rl = RLE(ZZ,RL);
+  printData(ARRAY, "Zero run-length", RL);
+
+  Encode(RL,rl,code);
+
+  return newDC;
+}
+
+int JPEGimage::myIntRound(float dInput)
 {
     if(dInput >= 0.0f)
     {
@@ -13,7 +106,7 @@ int myIntRound(float dInput)
     return ((int)(dInput - 0.5f));
 }
 
-float C(int u)
+float JPEGimage::C(int u)
 {
   if(u==0)
     return (1.0/sqrt(2.0));
@@ -21,7 +114,7 @@ float C(int u)
     return 1.0;
 }
  
-void DCT(int f[8][8],int F[8][8])
+void JPEGimage::DCT(int f[8][8],int F[8][8])
 {
   int u, v, x, y;
   float a;
@@ -36,7 +129,7 @@ void DCT(int f[8][8],int F[8][8])
       }
 }
 
-void Quantize(int F[8][8], int QF[8][8])
+void JPEGimage::Quantize(int F[8][8], int QF[8][8])
 {
   int q[8][8] = {
   		 {16,11,10,16,24,40,51,61},
@@ -57,7 +150,7 @@ void Quantize(int F[8][8], int QF[8][8])
     }
 }
 
-void ZigZag(int QF[8][8],int ZZ[64])
+void JPEGimage::ZigZag(int QF[8][8],int ZZ[64])
 {
   int i=0,j=0,k=0,d=0;
   while(k<36)
@@ -115,7 +208,7 @@ void ZigZag(int QF[8][8],int ZZ[64])
     }
 }
 
-int RLE(int ZZ[64],int RL[64])
+int JPEGimage::RLE(int ZZ[64],int RL[64])
 {
   int rl=1;
   int i=1;
@@ -163,7 +256,7 @@ int RLE(int ZZ[64],int RL[64])
   return rl;
 }
 
-int getCat(int a)
+int JPEGimage::getCat(int a)
 {
   if(a==0)
 	 return 0;
@@ -199,7 +292,7 @@ int getCat(int a)
 	 return 15;
 }
 
-void getDCcode(int a,int& lenb,char *size_value)
+void JPEGimage::getDCcode(int a,int& lenb,char *size_value)
 {
   int codeLen[12] = {3,4,5,6,7,8,10,12,14,16,18,20};
   const char* code[12] = {"010","011","100","00","101","110","1110","11110","111110","1111110","11111110","111111110"};
@@ -229,7 +322,7 @@ void getDCcode(int a,int& lenb,char *size_value)
 TODO: Detect No o between two AC value
 
 */
-void getACcode(int n,int a, int& lenb, char* b)
+void JPEGimage::getACcode(int n,int a, int& lenb, char* b)
 {
   int codeLen[16][11] = {
     {4 ,3 ,4 ,6 ,8 ,10,12,14,18,25,26},
@@ -289,7 +382,7 @@ void getACcode(int n,int a, int& lenb, char* b)
   b[lenb] = '\0';
 }
 
-void Encode(int RL[64], int rl, char* output)
+void JPEGimage::Encode(int RL[64], int rl, char* output)
 {
 //   char output[33*26];
    char b[32];
@@ -321,57 +414,15 @@ int main(void)
 				  {162, 162, 161, 161, 163, 158, 158, 158}
 				  };
 
-	int dctresult[8][8];
-
-	int Qresult[8][8];
-	int ZZresult[64];
-	int RLEresult[64] = {0};
-	int rlength;
 	char out[1000] = {'0'};
+  int DC = 0;
+	
+  JPEGimage jpeg;
 
-	DCT(test, dctresult);
-	Quantize(dctresult, Qresult);
-	ZigZag(Qresult, ZZresult);
-	rlength = RLE(ZZresult, RLEresult);
-	Encode(RLEresult, rlength, out);
-
-	int i=0, j=0;
-
-  printf("8*8 Block: \n");
-	for(i=0;i<8;i++){
-		for(j=0;j<8;j++){
-			
-			printf("%d, ", test[i][j]);
-		}
-		printf("\n");
-	}	
-	printf("\nDCT: \n");
-	for(i=0;i<8;i++){
-		for(j=0;j<8;j++){
-			
-			printf("%d, ", dctresult[i][j]);
-		}
-		printf("\n");
-	}
-	printf("\nQuantize: \n");
-	for(i=0;i<8;i++){
-		for(j=0;j<8;j++){
-			
-			printf("%d, ", Qresult[i][j]);
-		}
-		printf("\n");
-	}
-	printf("\nZigZag: \n");
-	for(i=0;i<64;i++){
-		printf("%d ", ZZresult[i]);
-	}
-	printf("\n");
-	printf("\nrl = %d", rlength);
-  	printf("\nRun-length:\n");
-	for(i=0;i<64;i++){
-		printf("%d ", RLEresult[i]);
-	}
-	printf("\n\nEncode result: \n %s\n", out);
+  jpeg.Compress(test, DC, out);
+  jpeg.printData(STRING, "Encode", out);
+  //printf("Encode: %s \n", out);
+	
 
 	return 0;
 }
