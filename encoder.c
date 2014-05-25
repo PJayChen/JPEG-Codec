@@ -1,21 +1,28 @@
 #include <stdio.h>
 #include <math.h>
 #include <string.h>
+#include <Magick++.h>
 
 #define abs(x) ( ( (x) < 0)? -(x):(x) )
 #define ARRAY 0
 #define BLOCK 1
 #define STRING 2
 
+using namespace Magick;
+
 class JPEGimage{
 public:
   
   int Compress(int f[8][8],int DCcomp, char* code);
-  void printData(int type, const char *name, const void*data);
-
+  void printData(int type, const char *name, const void *data);
+  void loadImage(const char* inFileName);
+  void ImageCompress(const char* outFileName);
+  
   JPEGimage()
   {
-
+    maxX = 0;
+    maxY = 0;
+    
   }
 
   ~JPEGimage()
@@ -23,6 +30,13 @@ public:
 
   }
 private:
+  float **luma; //Y
+  float **chroma_Cr; //Cr
+  float **chroma_Cb; //Cb 
+  int maxX, maxY;
+  static const int maxRGB = 255;
+
+
   int myIntRound(float dInput);
   float C(int u);
   void DCT(int f[8][8],int F[8][8]);
@@ -33,8 +47,39 @@ private:
   void getDCcode(int a,int& lenb,char *size_value);
   void getACcode(int n,int a, int& lenb, char* b);
   void Encode(int RL[64], int rl, char* output);
-
+  void RGB_YCbCr(PixelPacket *pixels);
 };
+
+void JPEGimage::loadImage(const char* inFileName)
+{
+
+  
+  Image image(inFileName);
+  maxX=image.columns();
+  maxY=image.rows();
+  image.classType(DirectClass);
+  printf("Loading image...\n");
+  printf("The Image size is %d x %d\n\n", maxX, maxY);
+
+  //Point to the left-top(start) pixel at the loaded image
+  PixelPacket *pixels = image.getPixels(0,0,maxX,maxY);
+  
+
+  int i;
+  //allocate memory
+  luma = new float*[maxY];
+  chroma_Cb = new float*[maxY];
+  chroma_Cr = new float*[maxY];
+  for(i=0;i<maxY;i++){
+    luma[i] = new float[maxX];
+    chroma_Cb[i] = new float[maxX];
+    chroma_Cr[i] = new float[maxX];
+  }
+
+  RGB_YCbCr(pixels);
+  ImageCompress("123");
+}
+
 
 void JPEGimage::printData(int type, const char *name, const void *data)
 {
@@ -64,6 +109,68 @@ void JPEGimage::printData(int type, const char *name, const void *data)
     }
     
     printf("\n");
+}
+
+void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
+{
+    int i,j;
+
+  printf("The RGB of the image: \n");
+  for(i=0;i<maxY;i++){
+    for(j=0;j<maxX;j++)
+    {    
+      ColorRGB rgb = Color(*(pixels+i*maxX+j));
+      printf("[%3d, %3d, %3d], ", (int)rgb.red()*maxRGB, (int)rgb.green()*maxRGB, (int)rgb.blue()*maxRGB);
+    }
+    printf("\n");
+  }
+  printf("\n");
+
+  printf("The YCrCb of the image:\n");
+  for(i = 0; i < maxY; i++){
+    for(j = 0; j < maxX; j++){
+      ColorRGB rgb = Color(*(pixels+i*maxX+j));
+      luma[i][j] = 0.299f * (int)rgb.red()*maxRGB + 0.587f * (int)rgb.green()*maxRGB + 0.114f * (int)rgb.blue()*maxRGB;
+      chroma_Cb[i][j] = -0.1687 * (int)rgb.red()*maxRGB - 0.3313f * (int)rgb.green()*maxRGB + 0.5f * (int)rgb.blue()*maxRGB + 128;
+      chroma_Cr[i][j] = 0.5f * (int)rgb.red()*maxRGB - 0.4187f * (int)rgb.green()*maxRGB - 0.0813f * (int)rgb.blue()*maxRGB + 128;
+      printf("[%3.3f, %3.3f, %3.3f]", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j]);
+    }
+    printf("\n");
+  }
+}
+
+void JPEGimage::ImageCompress(const char* outFileName)
+{
+  int x, y;
+  int i, j, u, v;
+  int f[8][8];
+  int DCcomp = 0;
+  char outData[1000];
+
+  x = maxX / 8;
+  y = maxY / 8;
+
+  printf("\nTotal has %d blocks\n\n", x*y);
+  for(i = 0; i < x; i++){
+    for(j = 0; j < y; j++ ){
+      printf("The block (%3d, %3d): \n", i, j);
+      for(u = i*8; u < i*8+8 ; u++){
+        for(v = j*8; v < j*8+8; v++){
+          //luma - 128 for DCT 
+          f[u][v] = myIntRound(luma[u][v] - 128);
+          printf("%3d ", f[u][v]);
+        }
+        printf("\n");
+      }
+      DCcomp = Compress(f, DCcomp, outData);
+    }
+  }
+
+
+/*
+  TO-DO: compression of Cr Cb 
+*/
+
 }
 
 int JPEGimage::Compress(int f[8][8],int DCcomp, char* code)
@@ -384,21 +491,25 @@ void JPEGimage::getACcode(int n,int a, int& lenb, char* b)
 
 void JPEGimage::Encode(int RL[64], int rl, char* output)
 {
-//   char output[33*26];
    char b[32];
    int bLen;
+   
    getDCcode(RL[0],bLen,b);
-   //   cout<<"Code : "<<RL[0]<<" "<<b;
+  
    strcpy(output,b);
+   
    int i;
    for(i=1;i<rl;i+=2)
    {
     	getACcode(RL[i],RL[i+1],bLen,b);
-    	//	cout<<" , "<<RL[i]<<" "<<RL[i+1]<<" "<<b;
     	strcat(output,b);
    }
-//   writeToFile(output);
+   
+   printData(STRING, "Encode", output);
 }
+
+
+
 
 int main(void)
 {
@@ -421,7 +532,9 @@ int main(void)
 
   jpeg.Compress(test, DC, out);
   jpeg.printData(STRING, "Encode", out);
-  //printf("Encode: %s \n", out);
+  
+  
+  jpeg.loadImage("test.bmp");
 	
 
 	return 0;
