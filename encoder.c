@@ -8,6 +8,11 @@
 #define BLOCK 1
 #define STRING 2
 
+#define VERBOSE_IMAGE_RGB 1
+#define VERBOSE_IMAGE_YUV 2
+#define VERBOSE_BLOCK_Y 4
+#define VERBOSE_COMPRESS 8
+
 using namespace Magick;
 
 class JPEGimage{
@@ -17,12 +22,13 @@ public:
   void printData(int type, const char *name, const void *data);
   void loadImage(const char* inFileName);
   void ImageCompress(const char* outFileName);
+  void verbose(int parameter);
   
   JPEGimage()
   {
     maxX = 0;
     maxY = 0;
-    
+    verbose_t = 0;
   }
 
   ~JPEGimage()
@@ -34,6 +40,7 @@ private:
   float **chroma_Cr; //Cr
   float **chroma_Cb; //Cb 
   int maxX, maxY;
+  int verbose_t;
   static const int maxRGB = 255;
 
 
@@ -49,6 +56,11 @@ private:
   void Encode(int RL[64], int rl, char* output);
   void RGB_YCbCr(PixelPacket *pixels);
 };
+
+void JPEGimage::verbose(int parameter)
+{
+	verbose_t = parameter;
+}
 
 void JPEGimage::loadImage(const char* inFileName)
 {
@@ -113,29 +125,39 @@ void JPEGimage::printData(int type, const char *name, const void *data)
 
 void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
 {
-    int i,j;
+  int i,j;
 
-  printf("The RGB of the image: \n");
+  if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
+  	printf("The RGB of the image: \n");
+  
   for(i=0;i<maxY;i++){
     for(j=0;j<maxX;j++)
     {    
       ColorRGB rgb = Color(*(pixels+i*maxX+j));
-      printf("[%3d, %3d, %3d], ", (int)rgb.red()*maxRGB, (int)rgb.green()*maxRGB, (int)rgb.blue()*maxRGB);
+      
+      if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
+      	printf("[%3d, %3d, %3d], ", (int)rgb.red()*maxRGB, (int)rgb.green()*maxRGB, (int)rgb.blue()*maxRGB);
     }
-    printf("\n");
+    if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
+    	printf("\n");
   }
   printf("\n");
-
-  printf("The YCrCb of the image:\n");
+  
+  if((verbose_t & VERBOSE_IMAGE_YUV) == VERBOSE_IMAGE_YUV)
+  	printf("The YCrCb of the image:\n");
+  
   for(i = 0; i < maxY; i++){
     for(j = 0; j < maxX; j++){
       ColorRGB rgb = Color(*(pixels+i*maxX+j));
       luma[i][j] = 0.299f * (int)rgb.red()*maxRGB + 0.587f * (int)rgb.green()*maxRGB + 0.114f * (int)rgb.blue()*maxRGB;
       chroma_Cb[i][j] = -0.1687 * (int)rgb.red()*maxRGB - 0.3313f * (int)rgb.green()*maxRGB + 0.5f * (int)rgb.blue()*maxRGB + 128;
       chroma_Cr[i][j] = 0.5f * (int)rgb.red()*maxRGB - 0.4187f * (int)rgb.green()*maxRGB - 0.0813f * (int)rgb.blue()*maxRGB + 128;
-      //printf("[%3.3f, %3.3f, %3.3f]", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j]);
+      
+      if((verbose_t & VERBOSE_IMAGE_YUV) == VERBOSE_IMAGE_YUV)
+      	printf("[%3.3f, %3.3f, %3.3f]", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j]);
     }
-    printf("\n");
+    if((verbose_t & VERBOSE_IMAGE_YUV) == VERBOSE_IMAGE_YUV)
+    	printf("\n");
   }
 }
 
@@ -165,9 +187,13 @@ void JPEGimage::ImageCompress(const char* outFileName)
         for(v = j*8; v < j*8+8; v++){
           //luma - 128 for DCT 
           f[u%8][v%8] = myIntRound(luma[u][v] - 128.0f);
-          printf("%3d ", f[u%8][v%8]);
+          
+          if((verbose_t & VERBOSE_BLOCK_Y) == VERBOSE_BLOCK_Y )
+          	printf("%3d ", f[u%8][v%8]);
+
         }/*for(v = j*8; v < j*8+8; v++)*/
-        printf("\n");
+        if((verbose_t & VERBOSE_BLOCK_Y) == VERBOSE_BLOCK_Y )
+        	printf("\n");
       }/*for(u = i*8; u < i*8+8 ; u++)*/
      
       //compress block and get last block DC value
@@ -189,15 +215,15 @@ void JPEGimage::ImageCompress(const char* outFileName)
 int JPEGimage::Compress(const int f[][8], int DCcomp, char* code)
 {
   
-  printData(BLOCK, "Block", (int*)f);
+  //printData(BLOCK, "Block", (int*)f);
 	
   int F[8][8];
   DCT(f,F); 
-  printData(BLOCK, "DCT", (int*)F);
+  //printData(BLOCK, "DCT", (int*)F);
 
   int QF[8][8];
   Quantize(F,QF);
-  printData(BLOCK, "Quantize", (int*)QF);
+  //printData(BLOCK, "Quantize", (int*)QF);
   
   //DPCM(Differential Pulse Code Modulateion)
   int newDC = QF[0][0];
@@ -205,14 +231,23 @@ int JPEGimage::Compress(const int f[][8], int DCcomp, char* code)
 
   int ZZ[64] = {0};
   ZigZag(QF,ZZ);
-  printData(ARRAY, "ZigZag", ZZ);
+  //printData(ARRAY, "ZigZag", ZZ);
 
   int RL[64] = {0};
   int rl;
   rl = RLE(ZZ,RL);
-  printData(ARRAY, "Zero run-length", RL);
+  //printData(ARRAY, "Zero run-length", RL);
 
   Encode(RL,rl,code);
+
+  if((verbose_t & VERBOSE_COMPRESS) == VERBOSE_COMPRESS ){
+  	printData(BLOCK, "Block", (int*)f);
+  	printData(BLOCK, "DCT", (int*)F);
+  	printData(BLOCK, "Quantize", (int*)QF);
+  	printData(ARRAY, "ZigZag", ZZ);
+  	printData(ARRAY, "Zero run-length", RL);
+  	printData(STRING, "Encode", code);
+  }
 
   return newDC;
 }
@@ -518,7 +553,7 @@ void JPEGimage::Encode(int RL[64], int rl, char* output)
     	strcat(output,b);
    }
    
-   printData(STRING, "Encode", output);
+   //printData(STRING, "Encode", output);
 }
 
 
@@ -526,7 +561,7 @@ void JPEGimage::Encode(int RL[64], int rl, char* output)
 
 int main(void)
 {
-	
+	/*
 	int test[8][8] = {
 				  {139, 144, 149, 153, 155, 155, 155, 155},
 				  {144, 151, 153, 156, 159, 156, 156, 156},
@@ -545,8 +580,9 @@ int main(void)
 
   jpeg.Compress(test, DC, out);
   jpeg.printData(STRING, "Encode", out);
-  
-  
+  */
+  JPEGimage jpeg;
+  jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV | VERBOSE_COMPRESS);
   jpeg.loadImage("test.bmp");
   //jpeg.loadImage("lena512.bmp");
 	
