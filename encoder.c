@@ -13,7 +13,7 @@ using namespace Magick;
 class JPEGimage{
 public:
   
-  int Compress(int f[8][8],int DCcomp, char* code);
+  int Compress(const int f[][8],int DCcomp, char* code);
   void printData(int type, const char *name, const void *data);
   void loadImage(const char* inFileName);
   void ImageCompress(const char* outFileName);
@@ -39,7 +39,7 @@ private:
 
   int myIntRound(float dInput);
   float C(int u);
-  void DCT(int f[8][8],int F[8][8]);
+  void DCT(const int f[][8],int F[8][8]);
   void Quantize(int F[8][8], int QF[8][8]);
   void ZigZag(int QF[8][8],int ZZ[64]);
   int RLE(int ZZ[64],int RL[64]);
@@ -91,7 +91,7 @@ void JPEGimage::printData(int type, const char *name, const void *data)
       int *block_data = (int *)data;
       for(i=0;i<8;i++){
         for(j=0;j<8;j++){
-          printf("%4d, ", *(block_data + j + i*8));
+          printf("%3d, ", *(block_data + j + i*8));
         }
         printf("\n");
       } 
@@ -133,39 +133,52 @@ void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
       luma[i][j] = 0.299f * (int)rgb.red()*maxRGB + 0.587f * (int)rgb.green()*maxRGB + 0.114f * (int)rgb.blue()*maxRGB;
       chroma_Cb[i][j] = -0.1687 * (int)rgb.red()*maxRGB - 0.3313f * (int)rgb.green()*maxRGB + 0.5f * (int)rgb.blue()*maxRGB + 128;
       chroma_Cr[i][j] = 0.5f * (int)rgb.red()*maxRGB - 0.4187f * (int)rgb.green()*maxRGB - 0.0813f * (int)rgb.blue()*maxRGB + 128;
-      printf("[%3.3f, %3.3f, %3.3f]", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j]);
+      //printf("[%3.3f, %3.3f, %3.3f]", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j]);
     }
     printf("\n");
   }
 }
 
+
+/*
+TO-DO: Write encode date into file
+*/
 void JPEGimage::ImageCompress(const char* outFileName)
 {
   int x, y;
   int i, j, u, v;
-  int f[8][8];
+  int f[8][8] = {0};
   int DCcomp = 0;
-  char outData[1000];
+  char blockEncodeData[500];
+  char imageEncodeData[1000] = "\0";
 
   x = maxX / 8;
   y = maxY / 8;
 
-  printf("\nTotal has %d blocks\n\n", x*y);
-  for(i = 0; i < x; i++){
-    for(j = 0; j < y; j++ ){
-      printf("The block (%3d, %3d): \n", i, j);
+  printf("\nTotal has %d(%d*%d) blocks\n\n", x*y, x, y);
+  for(i = 0; i < y; i++){
+    for(j = 0; j < x; j++ ){
+      
+      printf("The block (%3d, %3d): \n", j, i);
+      
       for(u = i*8; u < i*8+8 ; u++){
         for(v = j*8; v < j*8+8; v++){
           //luma - 128 for DCT 
-          f[u][v] = myIntRound(luma[u][v] - 128);
-          printf("%3d ", f[u][v]);
-        }
+          f[u%8][v%8] = myIntRound(luma[u][v] - 128.0f);
+          printf("%3d ", f[u%8][v%8]);
+        }/*for(v = j*8; v < j*8+8; v++)*/
         printf("\n");
-      }
-      DCcomp = Compress(f, DCcomp, outData);
-    }
-  }
+      }/*for(u = i*8; u < i*8+8 ; u++)*/
+     
+      //compress block and get last block DC value
+      DCcomp = Compress(f, DCcomp, blockEncodeData);
+      //cancate the blocks  encode data
+      strcat(imageEncodeData, blockEncodeData);
+      printf("---------------------------------------------\n\n");
+    }/*for(j = 0; j < x; j++ )*/
+  }/*for(i = 0; i < y; i++)*/
 
+  printf("JPGE Bitstream:\n%s\n", imageEncodeData);
 
 /*
   TO-DO: compression of Cr Cb 
@@ -173,11 +186,11 @@ void JPEGimage::ImageCompress(const char* outFileName)
 
 }
 
-int JPEGimage::Compress(int f[8][8],int DCcomp, char* code)
+int JPEGimage::Compress(const int f[][8], int DCcomp, char* code)
 {
   
   printData(BLOCK, "Block", (int*)f);
-
+	
   int F[8][8];
   DCT(f,F); 
   printData(BLOCK, "DCT", (int*)F);
@@ -186,7 +199,7 @@ int JPEGimage::Compress(int f[8][8],int DCcomp, char* code)
   Quantize(F,QF);
   printData(BLOCK, "Quantize", (int*)QF);
   
-
+  //DPCM(Differential Pulse Code Modulateion)
   int newDC = QF[0][0];
   QF[0][0] -= DCcomp;
 
@@ -221,7 +234,7 @@ float JPEGimage::C(int u)
     return 1.0;
 }
  
-void JPEGimage::DCT(int f[8][8],int F[8][8])
+void JPEGimage::DCT(const int f[][8],int F[8][8])
 {
   int u, v, x, y;
   float a;
@@ -535,6 +548,7 @@ int main(void)
   
   
   jpeg.loadImage("test.bmp");
+  //jpeg.loadImage("lena512.bmp");
 	
 
 	return 0;
