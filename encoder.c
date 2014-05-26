@@ -181,7 +181,7 @@ void JPEGimage::ImageCompress(const char* outFileName)
   for(i = 0; i < y; i++){
     for(j = 0; j < x; j++ ){
       
-      printf("The block (%3d, %3d): \n", j, i);
+      printf("Process block (%3d,%3d): \n", j, i);
       
       for(u = i*8; u < i*8+8 ; u++){
         for(v = j*8; v < j*8+8; v++){
@@ -246,6 +246,7 @@ int JPEGimage::Compress(const int f[][8], int DCcomp, char* code)
   	printData(BLOCK, "Quantize", (int*)QF);
   	printData(ARRAY, "ZigZag", ZZ);
   	printData(ARRAY, "Zero run-length", RL);
+  	printf("Length: %d\n\n", rl);
   	printData(STRING, "Encode", code);
   }
 
@@ -393,15 +394,20 @@ int JPEGimage::RLE(int ZZ[64],int RL[64])
 	    RL[rl++] = ZZ[i++];
 	  }
   }
-  //EOF
-  if(i == end_non_zero){
+
+  //EOF, end_non_zero <= 1 namely all AC are zero
+  if(i == end_non_zero || end_non_zero <= 1){
   	RL[rl++] = 0;
     RL[rl++] = 0;
   }
-  if(!(RL[rl-1]==0 && RL[rl-2]==0)){
-    RL[rl++] = 0;
-    RL[rl++] = 0;
-  }
+  
+  if(rl >= 3)
+	  if(!(RL[rl-1]==0 && RL[rl-2]==0)){
+	    RL[rl++] = 0;
+	    RL[rl++] = 0;
+	  }
+	
+
   /*
   if((RL[rl-4]==15)&&(RL[rl-3]==0)){
     RL[rl-4]=0;
@@ -577,15 +583,16 @@ int main(void)
   int DC = 0;
 	
   JPEGimage jpeg;
-
+  jpeg.verbose(VERBOSE_BLOCK_Y | VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV | VERBOSE_COMPRESS);
   jpeg.Compress(test, DC, out);
   jpeg.printData(STRING, "Encode", out);
   */
   JPEGimage jpeg;
-  jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV | VERBOSE_COMPRESS);
+  //jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV | VERBOSE_COMPRESS);
+  //jpeg.verbose(VERBOSE_BLOCK_Y);
+  jpeg.verbose(VERBOSE_COMPRESS);
   jpeg.loadImage("test.bmp");
-  //jpeg.loadImage("lena512.bmp");
-	
+
 
 	return 0;
 }
