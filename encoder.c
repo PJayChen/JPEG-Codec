@@ -22,7 +22,7 @@ public:
   void printData(int type, const char *name, const void *data);
   void loadImage(const char* inFileName);
   void ImageCompress(const char* outFileName);
-  void verbose(int parameter);
+  inline void verbose(int parameter);
   
   JPEGimage()
   {
@@ -57,7 +57,7 @@ private:
   void RGB_YCbCr(PixelPacket *pixels);
 };
 
-void JPEGimage::verbose(int parameter)
+inline void JPEGimage::verbose(int parameter)
 {
 	verbose_t = parameter;
 }
@@ -130,13 +130,14 @@ void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
   if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
   	printf("The RGB of the image: \n");
   
+  /*Get RGB from pixels*/
   for(i=0;i<maxY;i++){
     for(j=0;j<maxX;j++)
     {    
       ColorRGB rgb = Color(*(pixels+i*maxX+j));
       
       if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
-      	printf("[%3d, %3d, %3d], ", (int)rgb.red()*maxRGB, (int)rgb.green()*maxRGB, (int)rgb.blue()*maxRGB);
+      	printf("[%3d, %3d, %3d](%d, %d), ", (int)rgb.red()*maxRGB, (int)rgb.green()*maxRGB, (int)rgb.blue()*maxRGB, j, i);
     }
     if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
     	printf("\n");
@@ -146,6 +147,7 @@ void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
   if((verbose_t & VERBOSE_IMAGE_YUV) == VERBOSE_IMAGE_YUV)
   	printf("The YCrCb of the image:\n");
   
+  /*Convert RGB to YCbCr*/
   for(i = 0; i < maxY; i++){
     for(j = 0; j < maxX; j++){
       ColorRGB rgb = Color(*(pixels+i*maxX+j));
@@ -154,7 +156,7 @@ void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
       chroma_Cr[i][j] = 0.5f * (int)rgb.red()*maxRGB - 0.4187f * (int)rgb.green()*maxRGB - 0.0813f * (int)rgb.blue()*maxRGB + 128;
       
       if((verbose_t & VERBOSE_IMAGE_YUV) == VERBOSE_IMAGE_YUV)
-      	printf("[%3.3f, %3.3f, %3.3f]", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j]);
+      	printf("[%3.3f, %3.3f, %3.3f](%d,%d)", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j], j, i);
     }
     if((verbose_t & VERBOSE_IMAGE_YUV) == VERBOSE_IMAGE_YUV)
     	printf("\n");
@@ -172,7 +174,7 @@ void JPEGimage::ImageCompress(const char* outFileName)
   int f[8][8] = {0};
   int DCcomp = 0;
   char blockEncodeData[500];
-  char imageEncodeData[1000] = "\0";
+  char imageEncodeData[100000] = "\0";
 
   x = maxX / 8;
   y = maxY / 8;
@@ -187,7 +189,7 @@ void JPEGimage::ImageCompress(const char* outFileName)
         for(v = j*8; v < j*8+8; v++){
           //luma - 128 for DCT 
           f[u%8][v%8] = myIntRound(luma[u][v] - 128.0f);
-          
+
           if((verbose_t & VERBOSE_BLOCK_Y) == VERBOSE_BLOCK_Y )
           	printf("%3d ", f[u%8][v%8]);
 
@@ -198,9 +200,11 @@ void JPEGimage::ImageCompress(const char* outFileName)
      
       //compress block and get last block DC value
       DCcomp = Compress(f, DCcomp, blockEncodeData);
-      //cancate the blocks  encode data
+      //Concatenate the blocks encoded data
       strcat(imageEncodeData, blockEncodeData);
-      printf("---------------------------------------------\n\n");
+
+      if((verbose_t & VERBOSE_BLOCK_Y) == VERBOSE_BLOCK_Y )
+      	printf("---------------------------------------------\n\n");
     }/*for(j = 0; j < x; j++ )*/
   }/*for(i = 0; i < y; i++)*/
 
@@ -214,30 +218,24 @@ void JPEGimage::ImageCompress(const char* outFileName)
 
 int JPEGimage::Compress(const int f[][8], int DCcomp, char* code)
 {
-  
-  //printData(BLOCK, "Block", (int*)f);
-	
+  	
   int F[8][8];
   DCT(f,F); 
-  //printData(BLOCK, "DCT", (int*)F);
-
+  
   int QF[8][8];
   Quantize(F,QF);
-  //printData(BLOCK, "Quantize", (int*)QF);
-  
+   
   //DPCM(Differential Pulse Code Modulateion)
   int newDC = QF[0][0];
   QF[0][0] -= DCcomp;
 
   int ZZ[64] = {0};
   ZigZag(QF,ZZ);
-  //printData(ARRAY, "ZigZag", ZZ);
-
+  
   int RL[64] = {0};
   int rl;
   rl = RLE(ZZ,RL);
-  //printData(ARRAY, "Zero run-length", RL);
-
+  
   Encode(RL,rl,code);
 
   if((verbose_t & VERBOSE_COMPRESS) == VERBOSE_COMPRESS ){
@@ -588,10 +586,12 @@ int main(void)
   jpeg.printData(STRING, "Encode", out);
   */
   JPEGimage jpeg;
-  //jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV | VERBOSE_COMPRESS);
+  //jpeg.verbose(VERBOSE_IMAGE_YUV);  
+  //jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV);
   //jpeg.verbose(VERBOSE_BLOCK_Y);
-  jpeg.verbose(VERBOSE_COMPRESS);
-  jpeg.loadImage("test.bmp");
+  //jpeg.verbose(VERBOSE_COMPRESS);
+  //jpeg.loadImage("test.bmp");
+  jpeg.loadImage("lena512.bmp");
 
 
 	return 0;
