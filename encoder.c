@@ -2,6 +2,7 @@
 #include <math.h>
 #include <string.h>
 #include <Magick++.h>
+#include <iostream>
 
 #define abs(x) ( ( (x) < 0)? -(x):(x) )
 #define ARRAY 0
@@ -14,6 +15,7 @@
 #define VERBOSE_COMPRESS 8
 
 using namespace Magick;
+using namespace std;
 
 class JPEGimage{
 public:
@@ -137,7 +139,8 @@ void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
       ColorRGB rgb = Color(*(pixels+i*maxX+j));
       
       if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
-      	printf("[%3d, %3d, %3d](%d, %d), ", (int)rgb.red()*maxRGB, (int)rgb.green()*maxRGB, (int)rgb.blue()*maxRGB, j, i);
+      	printf("[%3d, %3d, %3d](%d, %d), ", (int)(rgb.red()*maxRGB), (int)(rgb.green()*maxRGB), (int)(rgb.blue()*maxRGB), j, i);
+        //printf("[%1.3f, %1.3f, %1.3f](%d, %d), ", rgb.red(), rgb.green(), rgb.blue(), j, i);
     }
     if((verbose_t & VERBOSE_IMAGE_RGB) == VERBOSE_IMAGE_RGB)
     	printf("\n");
@@ -151,9 +154,9 @@ void JPEGimage::RGB_YCbCr(PixelPacket *pixels)
   for(i = 0; i < maxY; i++){
     for(j = 0; j < maxX; j++){
       ColorRGB rgb = Color(*(pixels+i*maxX+j));
-      luma[i][j] = 0.299f * (int)rgb.red()*maxRGB + 0.587f * (int)rgb.green()*maxRGB + 0.114f * (int)rgb.blue()*maxRGB;
-      chroma_Cb[i][j] = -0.1687 * (int)rgb.red()*maxRGB - 0.3313f * (int)rgb.green()*maxRGB + 0.5f * (int)rgb.blue()*maxRGB + 128;
-      chroma_Cr[i][j] = 0.5f * (int)rgb.red()*maxRGB - 0.4187f * (int)rgb.green()*maxRGB - 0.0813f * (int)rgb.blue()*maxRGB + 128;
+      luma[i][j] = 0.299f * (rgb.red()*maxRGB) + 0.587f * (rgb.green()*maxRGB) + 0.114f * (rgb.blue()*maxRGB);
+      chroma_Cb[i][j] = -0.1687 * (rgb.red()*maxRGB) - 0.3313f * (rgb.green()*maxRGB) + 0.5f * (rgb.blue()*maxRGB) + 128;
+      chroma_Cr[i][j] = 0.5f * (rgb.red()*maxRGB) - 0.4187f * (rgb.green()*maxRGB) - 0.0813f * (rgb.blue()*maxRGB) + 128;
       
       if((verbose_t & VERBOSE_IMAGE_YUV) == VERBOSE_IMAGE_YUV)
       	printf("[%3.3f, %3.3f, %3.3f](%d,%d)", luma[i][j], chroma_Cb[i][j], chroma_Cr[i][j], j, i);
@@ -174,7 +177,7 @@ void JPEGimage::ImageCompress(const char* outFileName)
   int f[8][8] = {0};
   int DCcomp = 0;
   char blockEncodeData[500];
-  char imageEncodeData[100000] = "\0";
+  char imageEncodeData[5000000] = "\0";
 
   x = maxX / 8;
   y = maxY / 8;
@@ -551,13 +554,10 @@ void JPEGimage::Encode(int RL[64], int rl, char* output)
    strcpy(output,b);
    
    int i;
-   for(i=1;i<rl;i+=2)
-   {
+   for(i=1;i<rl;i+=2){
     	getACcode(RL[i],RL[i+1],bLen,b);
     	strcat(output,b);
    }
-   
-   //printData(STRING, "Encode", output);
 }
 
 
@@ -585,13 +585,16 @@ int main(void)
   jpeg.Compress(test, DC, out);
   jpeg.printData(STRING, "Encode", out);
   */
+  char openImage[20] = {'\0'};
   JPEGimage jpeg;
+  printf("Open Image: \n");
+  cin >> openImage;
   //jpeg.verbose(VERBOSE_IMAGE_YUV);  
   //jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV);
   //jpeg.verbose(VERBOSE_BLOCK_Y);
   //jpeg.verbose(VERBOSE_COMPRESS);
-  //jpeg.loadImage("test.bmp");
-  jpeg.loadImage("lena512.bmp");
+  jpeg.loadImage(openImage);
+  //jpeg.loadImage("lenaColor.bmp");
 
 
 	return 0;
