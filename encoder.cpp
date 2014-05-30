@@ -3,11 +3,13 @@
 #include <string.h>
 #include <Magick++.h>
 #include <iostream>
+#include "bitstream.h"
 
 #define abs(x) ( ( (x) < 0)? -(x):(x) )
 #define ARRAY 0
 #define BLOCK 1
 #define STRING 2
+#define BT 3
 
 #define VERBOSE_IMAGE_RGB 1
 #define VERBOSE_IMAGE_YUV 2
@@ -20,7 +22,7 @@ using namespace std;
 class JPEGimage{
 public:
   
-  int Compress(const int f[][8],int DCcomp, char* code);
+  int Compress(const int f[][8],int DCcomp, Bitstream & code);
   void printData(int type, const char *name, const void *data);
   void loadImage(const char* inFileName);
   void ImageCompress(const char* outFileName);
@@ -44,7 +46,7 @@ private:
   int maxX, maxY;
   int verbose_t;
   static const int maxRGB = 255;
-
+  Bitstream outputBitstream;
 
   int myIntRound(float dInput);
   float C(int u);
@@ -55,7 +57,7 @@ private:
   int getCat(int a);
   void getDCcode(int a,int& lenb,char *size_value);
   void getACcode(int n,int a, int& lenb, char* b);
-  void Encode(int RL[64], int rl, char* output);
+  void Encode(int RL[64], int rl, Bitstream & output);
   void RGB_YCbCr(PixelPacket *pixels);
 };
 
@@ -91,7 +93,7 @@ void JPEGimage::loadImage(const char* inFileName)
   }
 
   RGB_YCbCr(pixels);
-  ImageCompress("123");
+  ImageCompress("outputFileName");
 }
 
 
@@ -109,17 +111,18 @@ void JPEGimage::printData(int type, const char *name, const void *data)
         }
         printf("\n");
       } 
-    }
-    else if(type == ARRAY){
+    }else if(type == ARRAY){
       int *array_data = (int *)data;
       for(j=0;j<64;j++){
         printf("%2d, ", array_data[j]);
       }
       printf("\n");
-    }
-    else if(type == STRING){
+    }else if(type == STRING){
       char *string_data = (char *) data;
       printf("%s\n", string_data);
+    }else if(type == BT){
+      Bitstream *bt = (Bitstream *)data;
+      bt->displayTailImageBlockDCAC();
     }
     
     printf("\n");
@@ -176,8 +179,8 @@ void JPEGimage::ImageCompress(const char* outFileName)
   int i, j, u, v;
   int f[8][8] = {0};
   int DCcomp = 0;
-  char blockEncodeData[500];
-  char imageEncodeData[5000000] = "\0";
+  //char blockEncodeData[500];
+  //char imageEncodeData[5000000] = "\0";
 
   x = maxX / 8;
   y = maxY / 8;
@@ -202,16 +205,17 @@ void JPEGimage::ImageCompress(const char* outFileName)
       }/*for(u = i*8; u < i*8+8 ; u++)*/
      
       //compress block and get last block DC value
-      DCcomp = Compress(f, DCcomp, blockEncodeData);
+      DCcomp = Compress(f, DCcomp, outputBitstream);
       //Concatenate the blocks encoded data
-      strcat(imageEncodeData, blockEncodeData);
+      //strcat(imageEncodeData, blockEncodeData);
 
       if((verbose_t & VERBOSE_BLOCK_Y) == VERBOSE_BLOCK_Y )
       	printf("---------------------------------------------\n\n");
     }/*for(j = 0; j < x; j++ )*/
   }/*for(i = 0; i < y; i++)*/
 
-  printf("JPGE Bitstream:\n%s\n", imageEncodeData);
+  printf("JPGE Bitstream:\n");
+  outputBitstream.displayAll();
 
 /*
   TO-DO: compression of Cr Cb 
@@ -219,7 +223,7 @@ void JPEGimage::ImageCompress(const char* outFileName)
 
 }
 
-int JPEGimage::Compress(const int f[][8], int DCcomp, char* code)
+int JPEGimage::Compress(const int f[][8], int DCcomp, Bitstream & code)
 {
   	
   int F[8][8];
@@ -248,7 +252,8 @@ int JPEGimage::Compress(const int f[][8], int DCcomp, char* code)
   	printData(ARRAY, "ZigZag", ZZ);
   	printData(ARRAY, "Zero run-length", RL);
   	printf("Length: %d\n\n", rl);
-  	printData(STRING, "Encode", code);
+  	printData(BT, "Encode", &code);
+    //code.displayTailImageBlockDCAC();
   }
 
   return newDC;
@@ -459,7 +464,7 @@ void JPEGimage::getDCcode(int a,int& lenb,char *size_value)
   int codeLen[12] = {3,4,5,6,7,8,10,12,14,16,18,20};
   const char* code[12] = {"010","011","100","00","101","110","1110","11110","111110","1111110","11111110","111111110"};
   int cat = getCat(a); //get SIZE of DC
-  lenb = codeLen[cat]; //pick out the Code length by SIZE. neme by Image Compression JPGE.pdf
+  lenb = codeLen[cat]; //pick out the Code length by SIZE. the name SIZE is according to Image Compression JPGE.pdf
   strcpy(size_value,code[cat]);
   int j;
   int c = a;
@@ -544,19 +549,20 @@ void JPEGimage::getACcode(int n,int a, int& lenb, char* b)
   b[lenb] = '\0';
 }
 
-void JPEGimage::Encode(int RL[64], int rl, char* output)
+void JPEGimage::Encode(int RL[64], int rl, Bitstream & output)
 {
    char b[32];
    int bLen;
    
    getDCcode(RL[0],bLen,b);
-  
-   strcpy(output,b);
+   output.add_DC(b);
+   //strcpy(output,b);
    
    int i;
    for(i=1;i<rl;i+=2){
     	getACcode(RL[i],RL[i+1],bLen,b);
-    	strcat(output,b);
+    	output.add_ACtoTailBlock(b);
+      //strcat(output,b);
    }
 }
 
@@ -592,7 +598,7 @@ int main(void)
   //jpeg.verbose(VERBOSE_IMAGE_YUV);  
   //jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV);
   //jpeg.verbose(VERBOSE_BLOCK_Y);
-  //jpeg.verbose(VERBOSE_COMPRESS);
+  jpeg.verbose(VERBOSE_COMPRESS);
   jpeg.loadImage(openImage);
   //jpeg.loadImage("lenaColor.bmp");
 
