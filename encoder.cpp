@@ -461,8 +461,8 @@ int JPEGimage::getCat(int a)
 
 void JPEGimage::getDCcode(int a,int& lenb,char *size_value)
 {
-  int codeLen[12] = {3,4,5,6,7,8,10,12,14,16,18,20};
-  const char* code[12] = {"010","011","100","00","101","110","1110","11110","111110","1111110","11111110","111111110"};
+  int codeLen[12] = {2,4,5,6,7,8,10,12,14,16,18,20};
+  const char* code[12] = {"00","010","011","100","101","110","1110","11110","111110","1111110","11111110","111111110"};
   int cat = getCat(a); //get SIZE of DC
   lenb = codeLen[cat]; //pick out the Code length by SIZE. the name SIZE is according to Image Compression JPGE.pdf
   strcpy(size_value,code[cat]);
