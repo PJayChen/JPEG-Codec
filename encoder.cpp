@@ -93,7 +93,7 @@ void JPEGimage::loadImage(const char* inFileName)
   }
 
   RGB_YCbCr(pixels);
-  ImageCompress("outputFileName");
+  //ImageCompress("outputFileName");
 }
 
 
@@ -216,6 +216,14 @@ void JPEGimage::ImageCompress(const char* outFileName)
 
   printf("JPGE Bitstream:\n");
   outputBitstream.displayAll();
+
+  FILE *fp;
+  if(NULL == (fp=fopen(outFileName, "w+b"))) printf("Error in opening file.\n");
+  //write the block size in the front of file
+  putc(x, fp);
+  putc(y, fp);
+  if(fclose(fp)) printf("Error in close file.\n");
+  outputBitstream.writeToFileInBinary(outFileName);
 
 /*
   TO-DO: compression of Cr Cb 
@@ -598,8 +606,9 @@ int main(void)
   //jpeg.verbose(VERBOSE_IMAGE_YUV);  
   //jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV);
   //jpeg.verbose(VERBOSE_BLOCK_Y);
-  jpeg.verbose(VERBOSE_COMPRESS);
+  //jpeg.verbose(VERBOSE_COMPRESS);
   jpeg.loadImage(openImage);
+  jpeg.ImageCompress("out.Ajpg");
   //jpeg.loadImage("lenaColor.bmp");
 
 
