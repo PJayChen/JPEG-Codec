@@ -56,11 +56,11 @@ void Bitstream::add_DC(const char *DC)
 {
 	//new node
 	ptr_block = new bitstream_data;
-	ptr_block->data = (char *)malloc(sizeof(DC)+1);
+	ptr_block->data = (char *)malloc(strlen(DC) + 1);
 	strcpy(ptr_block->data, DC);
 	ptr_block->next = NULL;
 	ptr_block->AC_head = NULL;
-	numberOfBits+= sizeof(DC);//conunt there are how many bits 
+	numberOfBits+= strlen(DC);//conunt there are how many bits 
 	//allocate memory for AC component
 	ptr_block->AC_head = new bitstream_data;
 	ptr_block->AC_head->next = NULL;
@@ -84,12 +84,12 @@ void Bitstream::add_ACtoTailBlock(const char *AC)
 {
 	//new node 
 	ptr_block = new bitstream_data;
-	ptr_block->data = (char *)malloc(sizeof(AC)+1);
+	ptr_block->data = (char *)malloc(strlen(AC)+1);
 	strcpy(ptr_block->data, AC);
 	ptr_block->AC_head = NULL;
 	ptr_block->next = NULL;
 
-	numberOfBits+= sizeof(AC);//conunt there are how many bits 
+	numberOfBits+= strlen(AC);//conunt there are how many bits 
 
 	prev_block = head_block;
 	current_block = head_block->next;	
@@ -188,6 +188,7 @@ void Bitstream::writeToFileInBinary(const char *outFileName)
 {
 	FILE *fp;
 	allData = new char[numberOfBits];
+	*allData = '\0';
 
 	if(NULL == (fp=fopen(outFileName, "a+b")))
 		printf("Error in opening file.\n");
