@@ -22,7 +22,6 @@ using namespace std;
 class JPEGimage{
 public:
   
-  int Compress(const int f[][8],int DCcomp, Bitstream & code);
   void printData(int type, const char *name, const void *data);
   void loadImage(const char* inFileName);
   void ImageCompress(const char* outFileName);
@@ -37,7 +36,7 @@ public:
 
   ~JPEGimage()
   {
-
+    /*TODO: Free memory*/
   }
 private:
   float **luma; //Y
@@ -50,6 +49,7 @@ private:
 
   int myIntRound(float dInput);
   float C(int u);
+  int Compress(const int f[][8],int DCcomp, Bitstream & code);
   void DCT(const int f[][8],int F[8][8]);
   void Quantize(int F[8][8], int QF[8][8]);
   void ZigZag(int QF[8][8],int ZZ[64]);
