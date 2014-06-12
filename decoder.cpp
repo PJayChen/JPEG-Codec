@@ -3,6 +3,11 @@
 #include <string.h>
 #include <math.h>
 
+#define ARRAY 0
+#define BLOCK 1
+#define STRING 2
+#define BT 3
+
 typedef unsigned char  Byte;
 
 class JPEGimage{
@@ -24,12 +29,40 @@ private:
 	char *bitstream_data;
 	char *bdptr; //point to the current processing position of bitstream_data
 	int JpegSizeX, JpegSizeY;
-    
+
+    void printData(int type, const char *name, const void *data);
     int decodeDC(void);
     void decodeAC(int *zeroRL, int *ACvalue);
+    void RLED(int ZZ[64],int RL[64]);
 };
 
+void JPEGimage::printData(int type, const char *name, const void *data)
+{
+    int i,j;
 
+    printf("%s:\n", name);
+    
+    if(type == BLOCK){
+      int *block_data = (int *)data;
+      for(i=0;i<8;i++){
+        for(j=0;j<8;j++){
+          printf("%3d, ", *(block_data + j + i*8));
+        }
+        printf("\n");
+      } 
+    }else if(type == ARRAY){
+      int *array_data = (int *)data;
+      for(j=0;j<64;j++){
+        printf("%2d, ", array_data[j]);
+      }
+      printf("\n");
+    }else if(type == STRING){
+      char *string_data = (char *) data;
+      printf("%s\n", string_data);
+    }
+    
+    printf("\n");
+}
 /*
 * DC is composition with {SIZE, VALUE}
 * first we need to find out the SIZE part
@@ -164,11 +197,89 @@ void JPEGimage::decodeAC(int *zeroRL, int *ACvalue)
 
 }
 
+void JPEGimage::RLED(int ZZ[64],int RL[64])
+{
+  int rl=1;
+  int i=1;
+  int k = 0;
+  ZZ[0] = RL[0];
+  while(i<64)
+    {
+      if(RL[rl]==0 && RL[rl+1]==0)
+    {
+      for(k=i;k<64;k++)
+        ZZ[k] = 0;
+      return;
+    }
+      for(k=0;k<RL[rl];k++)
+    ZZ[i++] = 0;
+      ZZ[i++] = RL[rl+1];
+      rl+=2;
+    }
+}
+
+void ZigZagD(int QF[8][8],int ZZ[64])
+{
+  int i=0,j=0,k=0,d=0;
+  while(k<36)
+    {
+      QF[i][j] = ZZ[k++];
+      if((i==0)&&(j%2==0))
+    {
+      j++;
+      d=1;
+    }
+      else if((j==0)&&(i%2==1))
+    {
+      i++;
+      d=0;
+    }
+      else if(d==0)
+    {
+      i--;
+      j++;
+    }
+      else
+    {
+      i++;
+      j--;
+    }
+    }
+  i = 7;
+  j = 1;
+  while(k<64)
+    {
+      QF[i][j] = ZZ[k++];
+      if((i==7)&&(j%2==0))
+    {
+      j++;
+      d=0;
+    }
+      else if((j==7)&&(i%2==1))
+    {
+      i++;
+      d=1;
+    }
+      else if(d==0)
+    {
+      i--;
+      j++;
+    }
+      else
+    {
+      i++;
+      j--;
+    }
+    }
+}
+
 void JPEGimage::ImageDecompress(const char *BMPfileName)
 {
     int DCval = 0;
     int zeroRL, value;
     int RL[64] = {0};
+    int ZZ[64] = {0};
+    int QF[8][8] = {0};
     int rl = 0;
     int EOB = 0;
 
@@ -182,6 +293,12 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
         RL[rl++] = value;
         EOB = ((zeroRL == 0)&&(value == 0))?1:0;
     }
+
+    printData(ARRAY, "Zero Run-lenth", RL);
+    RLED(ZZ, RL);
+    printData(ARRAY, "ZigZag", ZZ);
+    ZigZagD(QF, ZZ);
+    printData(BLOCK, "Quantize", QF);
 }
 
 void JPEGimage::loadJPGEimage(const char *fileName)
