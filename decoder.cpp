@@ -46,7 +46,7 @@ void JPEGimage::printData(int type, const char *name, const void *data)
       int *block_data = (int *)data;
       for(i=0;i<8;i++){
         for(j=0;j<8;j++){
-          printf("%3d, ", *(block_data + j + i*8));
+          printf("%4d, ", *(block_data + j + i*8));
         }
         printf("\n");
       } 
@@ -273,6 +273,47 @@ void ZigZagD(int QF[8][8],int ZZ[64])
     }
 }
 
+void QuantizeD(int F[8][8], int QF[8][8])
+{
+    int q[8][8] = {
+         {16,11,10,16,24,40,51,61},
+         {12,12,14,19,26,58,60,55},
+         {14,13,16,24,40,57,69,56},
+         {14,17,22,29,51,87,80,62},
+         {18,22,37,56,68,109,103,77},
+         {24,35,55,64,81,104,113,92},
+         {49,64,78,87,103,121,120,101},
+         {72,92,95,98,112,100,103,99} 
+        };
+
+    int i,j;
+    for(i=0;i<8;i++)
+        for(j=0;j<8;j++)
+            F[i][j] = QF[i][j]*q[i][j];
+}
+
+float C(int u)
+{
+  if(u==0)
+    return (1.0/sqrt(8.0));
+  else
+    return (1.0/2.0);
+}
+
+void DCTD(int f[8][8],int F[8][8])
+{
+  float a;
+  for(int x=0;x<8;x++)
+    for(int y=0;y<8;y++)
+    {
+        a = 0.0;
+        for(int u=0;u<8;u++)
+            for(int v=0;v<8;v++)
+                a += C(u)*C(v)*float(F[u][v])*cos((2.0*float(x)+1.0)*float(u)*M_PI/16.0)*cos((2.0*float(y)+1.0)*float(v)*M_PI/16.0);
+        f[x][y] = int(a);
+    }
+}
+
 void JPEGimage::ImageDecompress(const char *BMPfileName)
 {
     int DCval = 0;
@@ -280,6 +321,8 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
     int RL[64] = {0};
     int ZZ[64] = {0};
     int QF[8][8] = {0};
+    int F[8][8] = {0};
+    int f[8][8] = {0};
     int rl = 0;
     int EOB = 0;
 
@@ -299,6 +342,10 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
     printData(ARRAY, "ZigZag", ZZ);
     ZigZagD(QF, ZZ);
     printData(BLOCK, "Quantize", QF);
+    QuantizeD(F, QF);
+    printData(BLOCK, "DCT", F);
+    DCTD(f, F);
+    printData(BLOCK, "Block", f);
 }
 
 void JPEGimage::loadJPGEimage(const char *fileName)
