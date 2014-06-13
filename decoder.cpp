@@ -9,6 +9,11 @@
 #define STRING 2
 #define BT 3
 
+#define VERBOSE_DECOMPRESS 1
+#define VERBOSE_BLOCKS_MERGE 2
+#define VERBOSE_BITSTREAM 4
+#define VERBOSE_DECODE 8
+
 typedef unsigned char  Byte;
 
 class JPEGimage{
@@ -16,10 +21,12 @@ class JPEGimage{
 public:
 	void loadJPGEimage(const char *fileName);
     void ImageDecompress(const char *BMPfileName);
+    inline void verbose(int parameter);
 
 	JPEGimage(){
 		JpegSizeX = 0;
 		JpegSizeY = 0;
+        verbose_t = 0;
 	}
 
 	~JPEGimage(){
@@ -31,6 +38,7 @@ private:
 	char *bitstream_data;
 	char *bdptr; //point to the current processing position of bitstream_data
 	int JpegSizeX, JpegSizeY;
+    int verbose_t;
 
     void printData(int type, const char *name, const void *data);
     int decodeDC(void);
@@ -41,7 +49,13 @@ private:
     float C(int u);
     void DCTD(int f[8][8],int F[8][8]);
     void saveImage(const char *BMPfileName);
+
 };
+
+inline void JPEGimage::verbose(int parameter)
+{
+    verbose_t = parameter;
+}
 
 void JPEGimage::printData(int type, const char *name, const void *data)
 {
@@ -115,8 +129,8 @@ int JPEGimage::decodeDC(void)
     	DC = DC + 1 - (int)pow(2, valueLen);
     }
 
-    //printf("bitstream_data start from %d, current is %d\n", bitstream_data, bdptr);
-    printf("DC: %s(%d)  \n", value, DC);
+    if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
+        printf("DC: %s(%d)  \n", value, DC);
     
 
     return DC;
@@ -164,7 +178,10 @@ void JPEGimage::decodeAC(int *zeroRL, int *ACvalue)
         {" ","111111110110","1111111111101100","1111111111101101","1111111111101110","1111111111101111","1111111111110000","1111111111110001","1111111111110010","1111111111110011","1111111111110100"},
         {"111111110111","1111111111110101","1111111111110110","1111111111110111","1111111111111000","1111111111111001","1111111111111010","1111111111111011","1111111111111100","1111111111111101","1111111111111110"}
     };
-    printf("AC: ");
+
+    if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
+        printf("AC: ");
+    
     //find the zero Run-lenth of AC
     int zero, size;
     for(zero = 0; zero < 16; zero++)
@@ -176,8 +193,9 @@ void JPEGimage::decodeAC(int *zeroRL, int *ACvalue)
     bdptr += strlen(code[zero][size]);
     //store how many zero between two AC component
     *zeroRL = zero;
-
-    printf("%s ", code[zero][size]);
+    
+    if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
+        printf("%s ", code[zero][size]);
 
     //The below is decompose the VALUE part from bitstream
     int valueLen = codeLen[zero][size] - strlen(code[zero][size]);
@@ -199,8 +217,9 @@ void JPEGimage::decodeAC(int *zeroRL, int *ACvalue)
     if(value[0] == '0'){
         *ACvalue = *ACvalue + 1 - (int)pow(2, valueLen);
     }
-
-    printf("%s(%d,%d)\n", value, *zeroRL,*ACvalue);
+    
+    if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
+        printf("%s(%d,%d)\n", value, *zeroRL,*ACvalue);
 
 }
 
@@ -312,7 +331,6 @@ void JPEGimage::saveImage(const char *BMPfileName)
   
     for(int i=0;i<JpegSizeY;i++)
         for(int j=0;j<JpegSizeX;j++)
-            //*(pixels + i*JpegSizeX + j)=Magick::Color(luma[i][j],luma[i][j],luma[i][j]);
             //*(pixels + i*JpegSizeX + j)=Magick::ColorGray(float(luma[i][j])/(float)255);
             *(pixels + i*JpegSizeX + j)=Magick::ColorRGB(float(luma[i][j])/(float)255,float(luma[i][j])/(float)255,float(luma[i][j])/(float)255);
     
@@ -364,12 +382,14 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
 
             //make print data of QF the same as encode part
             QF[0][0] = DCtmp; 
-            printData(ARRAY, "Zero Run-lenth", RL);
-            printData(ARRAY, "ZigZag", ZZ);
-            printData(BLOCK, "Quantize", QF);
-            printData(BLOCK, "DCT", F);
-            printData(BLOCK, "Block", f);
-            
+            if((verbose_t & VERBOSE_DECOMPRESS) == VERBOSE_DECOMPRESS){
+                printData(ARRAY, "Zero Run-lenth", RL);
+                printData(ARRAY, "ZigZag", ZZ);
+                printData(BLOCK, "Quantize", QF);
+                printData(BLOCK, "DCT", F);
+                printData(BLOCK, "Block", f);
+            }
+
             //merge blocks into a image 
             for(int u = i*8; u < i*8+8; u++)
                 for(int v = j*8; v < j*8+8; v++)
@@ -377,12 +397,15 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
         }
     }
 
-    printf("The Luma of the image:\n");
-    for(int i = 0; i < JpegSizeY; i++){
-        for(int j = 0; j < JpegSizeX; j++)
-            printf("%4d ", luma[i][j]);
-        printf("\n");    
+    if((verbose_t & VERBOSE_BLOCKS_MERGE) == VERBOSE_BLOCKS_MERGE){
+        printf("The Luma of the image:\n");
+        for(int i = 0; i < JpegSizeY; i++){
+            for(int j = 0; j < JpegSizeX; j++)
+                printf("%4d ", luma[i][j]);
+            printf("\n");    
+        }
     }
+
     saveImage(BMPfileName);
 }
 
@@ -431,14 +454,18 @@ void JPEGimage::loadJPGEimage(const char *fileName)
 	}
 
 	bitstream_data[file_size*8] = '\0'; 
-	printf("The file content is \n%s\n", bitstream_data);
-	if(fp) fclose(fp);
+
+    if((verbose_t & VERBOSE_BITSTREAM) == VERBOSE_BITSTREAM)
+	   printf("The file content is \n%s\n", bitstream_data);
+	
+    if(fp) fclose(fp);
 }
 
 int main(void)
 {
 	JPEGimage jj;
 
+    //jj.verbose(VERBOSE_BITSTREAM | VERBOSE_DECODE | VERBOSE_DECOMPRESS | VERBOSE_BLOCKS_MERGE);
 	jj.loadJPGEimage("out.Ajpg");
     jj.ImageDecompress("result.bmp");
 	
