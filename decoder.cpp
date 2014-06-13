@@ -1,3 +1,4 @@
+#include <Magick++.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,6 +36,11 @@ private:
     int decodeDC(void);
     void decodeAC(int *zeroRL, int *ACvalue);
     void RLED(int ZZ[64],int RL[64]);
+    void ZigZagD(int QF[8][8],int ZZ[64]);
+    void QuantizeD(int F[8][8], int QF[8][8]);
+    float C(int u);
+    void DCTD(int f[8][8],int F[8][8]);
+    void saveImage(const char *BMPfileName);
 };
 
 void JPEGimage::printData(int type, const char *name, const void *data)
@@ -217,7 +223,7 @@ void JPEGimage::RLED(int ZZ[64],int RL[64])
     }
 }
 
-void ZigZagD(int QF[8][8],int ZZ[64])
+void JPEGimage::ZigZagD(int QF[8][8],int ZZ[64])
 {
     int i=0,j=0,k=0,d=0;
     while(k<36){
@@ -256,7 +262,7 @@ void ZigZagD(int QF[8][8],int ZZ[64])
     }
 }
 
-void QuantizeD(int F[8][8], int QF[8][8])
+void JPEGimage::QuantizeD(int F[8][8], int QF[8][8])
 {
     int q[8][8] = {
          {16,11,10,16,24,40,51,61},
@@ -275,7 +281,7 @@ void QuantizeD(int F[8][8], int QF[8][8])
             F[i][j] = QF[i][j]*q[i][j];
 }
 
-float C(int u)
+float JPEGimage::C(int u)
 {
   if(u==0)
     return (1.0/sqrt(8.0));
@@ -283,7 +289,7 @@ float C(int u)
     return (1.0/2.0);
 }
 
-void DCTD(int f[8][8],int F[8][8])
+void JPEGimage::DCTD(int f[8][8],int F[8][8])
 {
   float a;
   for(int x=0;x<8;x++)
@@ -295,6 +301,21 @@ void DCTD(int f[8][8],int F[8][8])
                 a += C(u)*C(v)*float(F[u][v])*cos((2.0*float(x)+1.0)*float(u)*M_PI/16.0)*cos((2.0*float(y)+1.0)*float(v)*M_PI/16.0);
         f[x][y] = int(a);
     }
+}
+
+void JPEGimage::saveImage(const char *BMPfileName)
+{
+    Magick::Image image(Magick::Geometry(JpegSizeX, JpegSizeY), "white");
+    image.classType(Magick::DirectClass);
+    Magick::Pixels view(image);
+    Magick::PixelPacket *pixels=view.get(0,0,JpegSizeX, JpegSizeY);
+  
+    for(int i=0;i<JpegSizeY;i++)
+        for(int j=0;j<JpegSizeX;j++)
+            //*(pixels + i*JpegSizeX + j)=Magick::Color(luma[i][j],luma[i][j],luma[i][j]);
+            *(pixels + i*JpegSizeX + j)=Magick::ColorGray(float(luma[i][j])/(float)255);
+    
+    image.write(BMPfileName);
 }
 
 void JPEGimage::ImageDecompress(const char *BMPfileName)
@@ -361,6 +382,7 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
             printf("%4d ", luma[i][j]);
         printf("\n");    
     }
+    saveImage(BMPfileName);
 }
 
 void JPEGimage::loadJPGEimage(const char *fileName)
@@ -417,7 +439,7 @@ int main(void)
 	JPEGimage jj;
 
 	jj.loadJPGEimage("out.Ajpg");
-    jj.ImageDecompress("out.bmp");
+    jj.ImageDecompress("result.bmp");
 	
 	return 0;
 }
