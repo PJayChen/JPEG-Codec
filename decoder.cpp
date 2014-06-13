@@ -313,7 +313,8 @@ void JPEGimage::saveImage(const char *BMPfileName)
     for(int i=0;i<JpegSizeY;i++)
         for(int j=0;j<JpegSizeX;j++)
             //*(pixels + i*JpegSizeX + j)=Magick::Color(luma[i][j],luma[i][j],luma[i][j]);
-            *(pixels + i*JpegSizeX + j)=Magick::ColorGray(float(luma[i][j])/(float)255);
+            //*(pixels + i*JpegSizeX + j)=Magick::ColorGray(float(luma[i][j])/(float)255);
+            *(pixels + i*JpegSizeX + j)=Magick::ColorRGB(float(luma[i][j])/(float)255,float(luma[i][j])/(float)255,float(luma[i][j])/(float)255);
     
     image.write(BMPfileName);
 }
@@ -370,8 +371,8 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
             printData(BLOCK, "Block", f);
             
             //merge blocks into a image 
-            for(int u = i; u < i*8+8; u++)
-                for(int v = j; v < j*8+8; v++)
+            for(int u = i*8; u < i*8+8; u++)
+                for(int v = j*8; v < j*8+8; v++)
                     luma[u][v] = f[u%8][v%8] + 128;
         }
     }
