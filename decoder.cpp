@@ -26,6 +26,7 @@ public:
 	}
 
 private:
+    int **luma; //Y
 	char *bitstream_data;
 	char *bdptr; //point to the current processing position of bitstream_data
 	int JpegSizeX, JpegSizeY;
@@ -199,77 +200,59 @@ void JPEGimage::decodeAC(int *zeroRL, int *ACvalue)
 
 void JPEGimage::RLED(int ZZ[64],int RL[64])
 {
-  int rl=1;
-  int i=1;
-  int k = 0;
-  ZZ[0] = RL[0];
-  while(i<64)
-    {
-      if(RL[rl]==0 && RL[rl+1]==0)
-    {
-      for(k=i;k<64;k++)
-        ZZ[k] = 0;
-      return;
-    }
-      for(k=0;k<RL[rl];k++)
-    ZZ[i++] = 0;
-      ZZ[i++] = RL[rl+1];
-      rl+=2;
+    int rl=1;
+    int i=1;
+    int k = 0;
+    ZZ[0] = RL[0];
+    while(i<64){
+        if(RL[rl]==0 && RL[rl+1]==0){
+            for(k=i;k<64;k++)
+                ZZ[k] = 0;
+            return;
+        }
+        for(k=0;k<RL[rl];k++)
+            ZZ[i++] = 0;
+        ZZ[i++] = RL[rl+1];
+        rl+=2;
     }
 }
 
 void ZigZagD(int QF[8][8],int ZZ[64])
 {
-  int i=0,j=0,k=0,d=0;
-  while(k<36)
-    {
-      QF[i][j] = ZZ[k++];
-      if((i==0)&&(j%2==0))
-    {
-      j++;
-      d=1;
+    int i=0,j=0,k=0,d=0;
+    while(k<36){
+        QF[i][j] = ZZ[k++];
+        if((i==0)&&(j%2==0)){
+            j++;
+            d=1;
+        }else if((j==0)&&(i%2==1)){
+            i++;
+            d=0;
+        }else if(d==0){
+            i--;
+            j++;
+        }else{
+            i++;
+            j--;
+        }
     }
-      else if((j==0)&&(i%2==1))
-    {
-      i++;
-      d=0;
-    }
-      else if(d==0)
-    {
-      i--;
-      j++;
-    }
-      else
-    {
-      i++;
-      j--;
-    }
-    }
-  i = 7;
-  j = 1;
-  while(k<64)
-    {
-      QF[i][j] = ZZ[k++];
-      if((i==7)&&(j%2==0))
-    {
-      j++;
-      d=0;
-    }
-      else if((j==7)&&(i%2==1))
-    {
-      i++;
-      d=1;
-    }
-      else if(d==0)
-    {
-      i--;
-      j++;
-    }
-      else
-    {
-      i++;
-      j--;
-    }
+    i = 7;
+    j = 1;
+    while(k<64){
+        QF[i][j] = ZZ[k++];
+        if((i==7)&&(j%2==0)){
+            j++;
+            d=0;
+        }else if((j==7)&&(i%2==1)){
+            i++;
+            d=1;
+        }else if(d==0){
+            i--;
+            j++;
+        }else{
+            i++;
+            j--;
+        }
     }
 }
 
@@ -325,27 +308,59 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
     int f[8][8] = {0};
     int rl = 0;
     int EOB = 0;
+    int DCtmp = 0;
+    int x = JpegSizeX / 8;
+    int y = JpegSizeY / 8;
 
+    for(int i = 0; i < y ; i++){
+        for(int j = 0; j < x ; j++){
+            printf("\nProcessing Block (%2d, %2d) ...\n", j, i);
 
-    DCval += decodeDC();
-    RL[rl++] = DCval;
-    
-    while(!EOB){
-        decodeAC(&zeroRL, &value);
-        RL[rl++] = zeroRL;
-        RL[rl++] = value;
-        EOB = ((zeroRL == 0)&&(value == 0))?1:0;
+            //reset parameter
+            EOB = 0;
+            rl = 0;
+            for(int q=0;q<64;q++)
+                RL[q] = 0;
+
+            DCtmp = decodeDC();//the DC of current read block
+            DCval += DCtmp;    //add with last DC
+            RL[rl++] = DCtmp;
+            
+            //read all AC component
+            while(!EOB){
+                decodeAC(&zeroRL, &value);
+                RL[rl++] = zeroRL;
+                RL[rl++] = value;
+                EOB = ((zeroRL == 0)&&(value == 0))?1:0;
+            }
+            
+            RLED(ZZ, RL);
+            ZigZagD(QF, ZZ);
+            QF[0][0] = DCval;
+            QuantizeD(F, QF);
+            DCTD(f, F);
+
+            //make print data of QF the same as encode part
+            QF[0][0] = DCtmp; 
+            printData(ARRAY, "Zero Run-lenth", RL);
+            printData(ARRAY, "ZigZag", ZZ);
+            printData(BLOCK, "Quantize", QF);
+            printData(BLOCK, "DCT", F);
+            printData(BLOCK, "Block", f);
+            
+            //merge blocks into a image 
+            for(int u = i; u < i*8+8; u++)
+                for(int v = j; v < j*8+8; v++)
+                    luma[u][v] = f[u%8][v%8] + 128;
+        }
     }
 
-    printData(ARRAY, "Zero Run-lenth", RL);
-    RLED(ZZ, RL);
-    printData(ARRAY, "ZigZag", ZZ);
-    ZigZagD(QF, ZZ);
-    printData(BLOCK, "Quantize", QF);
-    QuantizeD(F, QF);
-    printData(BLOCK, "DCT", F);
-    DCTD(f, F);
-    printData(BLOCK, "Block", f);
+    printf("The Luma of the image:\n");
+    for(int i = 0; i < JpegSizeY; i++){
+        for(int j = 0; j < JpegSizeX; j++)
+            printf("%4d ", luma[i][j]);
+        printf("\n");    
+    }
 }
 
 void JPEGimage::loadJPGEimage(const char *fileName)
@@ -365,6 +380,11 @@ void JPEGimage::loadJPGEimage(const char *fileName)
     JpegSizeY = (unsigned int)getc(fp) * 8;
     printf("The Jpeg Image size is %d*%d\n", JpegSizeX, JpegSizeY);
     
+    //allocate memory for luma
+    luma = new int*[JpegSizeY];
+    for(i=0;i<JpegSizeY;i++){
+        luma[i] = new int[JpegSizeX];
+    }
 
 	//find the size of the file 	
 	fseek(fp, 0, SEEK_END); //move position indicator(PI) to the end of file
