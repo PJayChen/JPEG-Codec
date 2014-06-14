@@ -466,6 +466,7 @@ int main(void)
 	JPEGimage jj;
 
     //jj.verbose(VERBOSE_BITSTREAM | VERBOSE_DECODE | VERBOSE_DECOMPRESS | VERBOSE_BLOCKS_MERGE);
+    jj.verbose(VERBOSE_DECODE);
 	jj.loadJPGEimage("out.Ajpg");
     jj.ImageDecompress("result.bmp");
 	

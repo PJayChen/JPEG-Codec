@@ -289,14 +289,13 @@ void JPEGimage::DCT(const int f[][8],int F[8][8])
   int u, v, x, y;
   float a;
   for(u=0;u<8;u++)
-    for(v=0;v<8;v++)
-      {
+    for(v=0;v<8;v++){
     	a = 0.0;
-    for(x=0;x<8;x++)
-      for(y=0;y<8;y++)
-        a += (float)(f[x][y]) * cos( (2.0*(float)(x)+1.0)*(float)(u)*M_PI/16.0 ) * cos((2.0*(float)(y)+1.0)*(float)(v)*M_PI/16.0); 	
+      for(x=0;x<8;x++)
+        for(y=0;y<8;y++)
+          a += (float)(f[x][y]) * cos( (2.0*(float)(x)+1.0)*(float)(u)*M_PI/16.0 ) * cos((2.0*(float)(y)+1.0)*(float)(v)*M_PI/16.0); 	
     	F[u][v] = myIntRound(0.25*C(u)*C(v)*a);
-      }
+    }
 }
 
 void JPEGimage::Quantize(int F[8][8], int QF[8][8])
@@ -606,7 +605,7 @@ int main(void)
   //jpeg.verbose(VERBOSE_IMAGE_YUV);  
   //jpeg.verbose(VERBOSE_IMAGE_RGB | VERBOSE_IMAGE_YUV);
   //jpeg.verbose(VERBOSE_BLOCK_Y);
-  //jpeg.verbose(VERBOSE_COMPRESS);
+  //jpeg.verbose(VERBOSE_COMPRESS | VERBOSE_IMAGE_YUV);
   jpeg.loadImage(openImage);
   jpeg.ImageCompress("out.Ajpg");
   //jpeg.loadImage("lenaColor.bmp");
