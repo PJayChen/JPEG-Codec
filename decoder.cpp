@@ -469,5 +469,8 @@ int main(void)
 	jj.loadJPGEimage("out.Ajpg");
     jj.ImageDecompress("result.bmp");
 	
+    jj.loadJPGEimage("out.AjpgDC");
+    jj.ImageDecompress("resultDC.bmp");
+
 	return 0;
 }

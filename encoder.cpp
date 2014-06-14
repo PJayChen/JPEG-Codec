@@ -217,6 +217,7 @@ void JPEGimage::ImageCompress(const char* outFileName)
   printf("JPGE Bitstream:\n");
   outputBitstream.displayAll();
 
+  //write all component into file
   FILE *fp;
   if(NULL == (fp=fopen(outFileName, "w+b"))) printf("Error in opening file.\n");
   //write the block size in the front of file
@@ -224,6 +225,17 @@ void JPEGimage::ImageCompress(const char* outFileName)
   putc(y, fp);
   if(fclose(fp)) printf("Error in close file.\n");
   outputBitstream.writeToFileInBinary(outFileName);
+
+  //write only DC into file
+  char *fileNameOnlyDC = (char *)malloc(strlen(outFileName) * sizeof(char) + 3);
+  strcpy(fileNameOnlyDC, outFileName);
+  strcat(fileNameOnlyDC, "DC");
+  if(NULL == (fp=fopen(fileNameOnlyDC, "w+b"))) printf("Error in opening file.\n");
+  //write the block size in the front of file
+  putc(x, fp);
+  putc(y, fp);
+  if(fclose(fp)) printf("Error in close file.\n");
+  outputBitstream.writeTiFileOnlyDC(fileNameOnlyDC);
 
 /*
   TO-DO: compression of Cr Cb 
