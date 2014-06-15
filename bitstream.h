@@ -19,11 +19,15 @@ private:
 	bitstream_data *current_block;
 	bitstream_data *prev_block; 
 	char *allData;//to contain all DC + AC
+	char *onlyDCdata; //contain only DC component
 	long numberOfBits;
+	int numberOfDCbits;
 	void displayAC(bitstream_data *bd);
 	void stringToBinary(const char* a, FILE *fp);
 	void catAllComponent(char *all);
 	void catAcComponent(bitstream_data *bd, char *all);
+	void catAllDCcomponent(char *allDC);
+
 public:
 
 	Bitstream(void){
@@ -33,7 +37,9 @@ public:
 		head_block->next = NULL;
 
 		allData = NULL;
+		onlyDCdata = NULL;
 		numberOfBits = 0;
+		numberOfDCbits = 0;
 	}
 
 	/*
@@ -49,6 +55,7 @@ public:
 	void displayAll(void);
 	void displayTailImageBlockDCAC(void);
 	void writeToFileInBinary(const char *outFileName);
+	void writeTiFileOnlyDC(const char *outFileName);
 
 };
 
@@ -60,7 +67,10 @@ void Bitstream::add_DC(const char *DC)
 	strcpy(ptr_block->data, DC);
 	ptr_block->next = NULL;
 	ptr_block->AC_head = NULL;
-	numberOfBits+= strlen(DC);//conunt there are how many bits 
+	
+	numberOfBits += strlen(DC);//conunt there are how many bits 
+	numberOfDCbits += strlen(DC);
+
 	//allocate memory for AC component
 	ptr_block->AC_head = new bitstream_data;
 	ptr_block->AC_head->next = NULL;
@@ -145,7 +155,7 @@ void Bitstream::displayAll(void)
 		printf("\n");
 	}	
 	printf("\n");
-	printf("There are %ld bits\n", numberOfBits);
+	printf("There are %ld bits(DC: %d)\n", numberOfBits, numberOfDCbits);
 }
 
 void Bitstream::displayAC(bitstream_data *bd)
@@ -181,6 +191,35 @@ void Bitstream::catAllComponent(char *all)
 		current_block = current_block->next;
 	}	
 }
+
+void Bitstream::catAllDCcomponent(char *allDC)
+{
+	current_block = head_block->next;//head didn't store data
+	while(current_block){
+		strcat(allDC, current_block->data);
+		strcat(allDC, "1010");
+		current_block = current_block->next;
+	}		
+}
+
+void Bitstream::writeTiFileOnlyDC(const char *outFileName)
+{
+	FILE *fp;
+	onlyDCdata = new char[numberOfDCbits + 4*4096 + 1];
+	*onlyDCdata = '\0';
+
+	if(NULL == (fp=fopen(outFileName, "a+b")))
+		printf("Error in opening file.\n");
+
+	catAllDCcomponent(onlyDCdata);
+	printf("write the following data into file %s \n%s\n", outFileName, onlyDCdata);
+	stringToBinary(onlyDCdata, fp);
+
+	if(fp) fclose(fp);
+
+	delete[] onlyDCdata;
+}
+
 /*
  *  write string of all component into the file point by fp
  */
