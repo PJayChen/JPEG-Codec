@@ -5,9 +5,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+
+//Could be used by block_list or AC_list
 struct bitstream_data{
 	char *data; //Could be DC or AC
-	bitstream_data *AC_head;
+	bitstream_data *AC_head; //point to the AC_list head
 	bitstream_data *next;
 };
 
@@ -20,8 +22,8 @@ private:
 	bitstream_data *prev_block; 
 	char *allData;//to contain all DC + AC
 	char *onlyDCdata; //contain only DC component
-	long numberOfBits;
-	int numberOfDCbits;
+	long numberOfBits; //Total bits of the data(DC + AC)
+	int numberOfDCbits; //sum of DC bits
 	void displayAC(bitstream_data *bd);
 	void stringToBinary(const char* a, FILE *fp);
 	void catAllComponent(char *all);
@@ -59,6 +61,16 @@ public:
 
 };
 
+/*
+* Add a DC component into the block_list
+*
+* this function will create a new node to contain the DC
+* than link this node at the tail of the block_list
+*
+* current_block will point to the tail node of the block_list
+*
+* how many times add_DC() has beed called namely there are how many blocks.
+*/
 void Bitstream::add_DC(const char *DC)
 {
 	//new node
@@ -90,6 +102,15 @@ void Bitstream::add_DC(const char *DC)
 	current_block->next = ptr_block;
 }
 
+/*
+ * Add a AC component into the AC_list
+ * 
+ * The AC_list is point by the current_block->AC_head
+ * Each block_list node has a linked list of AC_list
+ *
+ * This function will create a new node to contain the AC
+ * than link the node at the end of AC_head
+ */
 void Bitstream::add_ACtoTailBlock(const char *AC)
 {
 	//new node 
@@ -122,6 +143,9 @@ void Bitstream::add_ACtoTailBlock(const char *AC)
 	current_block->next = ptr_block;
 }
 
+/*
+ * Display all block_list's data namely DC component of the image
+ */
 void Bitstream::displayAllDCs(void)
 {
 	current_block = head_block->next;
@@ -131,6 +155,9 @@ void Bitstream::displayAllDCs(void)
 	}
 }
 
+/*
+ * Display the latest data (the tail of list)
+ */
 void Bitstream::displayTailImageBlockDCAC(void)
 {
 	current_block = head_block->next;
@@ -145,6 +172,9 @@ void Bitstream::displayTailImageBlockDCAC(void)
 	printf("\n");
 }
 
+/*
+ * Display all stroed data in the block_list and AC_list
+ */
 void Bitstream::displayAll(void)
 {
 	current_block = head_block->next;//head didn't store data
@@ -158,6 +188,9 @@ void Bitstream::displayAll(void)
 	printf("There are %ld bits(DC: %d)\n", numberOfBits, numberOfDCbits);
 }
 
+/*
+ * Display all AC component which the AC_list head was pointed by bd
+ */
 void Bitstream::displayAC(bitstream_data *bd)
 {	
 	bd = bd->AC_head->next; //head didn't store data
@@ -192,6 +225,9 @@ void Bitstream::catAllComponent(char *all)
 	}	
 }
 
+/*
+ *	concatenate All blocks DC component into a string
+ */
 void Bitstream::catAllDCcomponent(char *allDC)
 {
 	current_block = head_block->next;//head didn't store data
@@ -202,6 +238,9 @@ void Bitstream::catAllDCcomponent(char *allDC)
 	}		
 }
 
+/*
+ *  write string of all DC component into the file point by fp
+ */
 void Bitstream::writeTiFileOnlyDC(const char *outFileName)
 {
 	FILE *fp;
@@ -242,6 +281,9 @@ void Bitstream::writeToFileInBinary(const char *outFileName)
 	delete[] allData;
 }
 
+/*
+ *  convert the string to the binary format
+ */
 void Bitstream::stringToBinary(const char* a, FILE *fp)
 {
 	int len = strlen(a);
@@ -262,21 +304,3 @@ void Bitstream::stringToBinary(const char* a, FILE *fp)
 }
 
 #endif
-
-/*
-int main(void)
-{
-	Bitstream b;
-	b.add_DC("11111");
-	b.add_ACtoTailBlock("00000");
-	b.add_ACtoTailBlock("000110000111");
-	b.add_ACtoTailBlock("011000000");
-	b.add_DC("0111");
-	b.add_ACtoTailBlock("000001100");
-	b.add_ACtoTailBlock("11111111111111101111110");
-	b.add_ACtoTailBlock("011000000");
-	b.add_DC("11111111111111101111111110");
-	b.displayAll();
-	return 0;
-}
-*/
