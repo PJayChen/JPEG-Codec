@@ -57,14 +57,36 @@ public:
 	void displayAll(void);
 	void displayTailImageBlockDCAC(void);
 	void writeToFileInBinary(const char *outFileName);
-	void writeTiFileOnlyDC(const char *outFileName);
-
+	void writeToFileOnlyDC(const char *outFileName);
+	inline void mv_CurBlk_to_next(void);
+	inline void mv_CurBlk_to_head(void);
 };
+
+
+
+/*
+ *  Move the current_block point to next node of block_list
+ */
+inline void Bitstream::mv_CurBlk_to_next(void)
+{
+	current_block = current_block->next;
+}
+
+/*
+ * Make the current_block point back to first node(head_block->next) of block_list
+ */
+inline void Bitstream::mv_CurBlk_to_head(void)
+{	
+	if(head_block->next != NULL)
+		current_block = head_block->next;
+	else 
+		printf("error: head_block->next is NULL");
+}
 
 /*
 * Add a DC component into the block_list
 *
-* this function will create a new node to contain the DC
+* this function will create a new node to contain a DC
 * than link this node at the tail of the block_list
 *
 * current_block will point to the tail node of the block_list
@@ -241,7 +263,7 @@ void Bitstream::catAllDCcomponent(char *allDC)
 /*
  *  write string of all DC component into the file point by fp
  */
-void Bitstream::writeTiFileOnlyDC(const char *outFileName)
+void Bitstream::writeToFileOnlyDC(const char *outFileName)
 {
 	FILE *fp;
 	onlyDCdata = new char[numberOfDCbits + 4*4096 + 1];
@@ -272,7 +294,7 @@ void Bitstream::writeToFileInBinary(const char *outFileName)
 		printf("Error in opening file.\n");
 
 	catAllComponent(allData);
-	printf("write the following data into file %s \n%s\n", outFileName, allData);
+	printf("write the following data into file %s \n%s\n%ld Byte\n", outFileName, allData, strlen(allData)/8);
 	stringToBinary(allData, fp);
 
 	if(fclose(fp))
