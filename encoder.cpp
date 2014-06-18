@@ -235,8 +235,22 @@ void JPEGimage::ImageCompress(const char* outFileName)
   putc(x, fp);
   putc(y, fp);
   if(fclose(fp)) printf("Error in close file.\n");
-  outputBitstream.writeTiFileOnlyDC(fileNameOnlyDC);
-
+  outputBitstream.writeToFileOnlyDC(fileNameOnlyDC);
+  
+  //write with some AC into file
+  for(char q = 1; q < 7; q++){
+    char *fileNameSomeAC = (char *)malloc(strlen(outFileName) * sizeof(char) + 4);
+    strcpy(fileNameSomeAC, outFileName);
+    strcat(fileNameSomeAC, "AC");
+    fileNameSomeAC[strlen(outFileName) + 2] = (char)('0' + q);
+    fileNameSomeAC[strlen(outFileName) + 3] = '\0';
+    if(NULL == (fp=fopen(fileNameSomeAC, "w+b"))) printf("Error in opening file.\n");
+    //write the block size in the front of file
+    putc(x, fp);
+    putc(y, fp);
+    if(fclose(fp)) printf("Error in close file.\n");
+    outputBitstream.writeToFileWithSomeAC(fileNameSomeAC, q);
+  }
 /*
   TO-DO: compression of Cr Cb 
 */

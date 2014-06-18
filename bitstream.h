@@ -29,6 +29,8 @@ private:
 	void catAllComponent(char *all);
 	void catAcComponent(bitstream_data *bd, char *all);
 	void catAllDCcomponent(char *allDC);
+	void catSomeAcComponent(bitstream_data *bd, char *all, int number);
+	void catAllDCandSomeACcomponent(char *all, int number);
 
 public:
 
@@ -58,8 +60,10 @@ public:
 	void displayTailImageBlockDCAC(void);
 	void writeToFileInBinary(const char *outFileName);
 	void writeToFileOnlyDC(const char *outFileName);
+	void writeToFileWithSomeAC(const char *outFileName, int ACnumber);
 	inline void mv_CurBlk_to_next(void);
 	inline void mv_CurBlk_to_head(void);
+	void add_ACtoCurBlk(const char *AC);
 };
 
 
@@ -81,6 +85,41 @@ inline void Bitstream::mv_CurBlk_to_head(void)
 		current_block = head_block->next;
 	else 
 		printf("error: head_block->next is NULL");
+}
+
+/*
+ * This function will add a AC into new node of tail AC_lsit 
+ * of the block node point by current_block.
+ * 
+ * Notice, 
+ * use this function you must be clearly known where the current_block is point to.
+ */
+void Bitstream::add_ACtoCurBlk(const char *AC)
+{
+	//new node 
+	ptr_block = new bitstream_data;
+	ptr_block->data = (char *)malloc(strlen(AC)+1);
+	strcpy(ptr_block->data, AC);
+	ptr_block->AC_head = NULL;
+	ptr_block->next = NULL;
+
+	//conunt there are how many bits 	
+	numberOfBits+= strlen(AC);
+
+	bitstream_data *tail_node;
+
+	//locate out the head of AC list
+	prev_block = current_block->AC_head;
+	tail_node = current_block->AC_head->next;
+	
+	//find tail AC in tial block image
+	while(tail_node){
+		prev_block = tail_node;
+		tail_node = tail_node->next;
+	}
+	tail_node = prev_block;  
+	tail_node->next = ptr_block;
+
 }
 
 /*
@@ -258,6 +297,51 @@ void Bitstream::catAllDCcomponent(char *allDC)
 		strcat(allDC, "1010");
 		current_block = current_block->next;
 	}		
+}
+
+void Bitstream::catSomeAcComponent(bitstream_data *bd, char *all, int number)
+{
+	bd = bd->AC_head->next; //head didn't store data
+	int i = 0;
+
+		while(bd){
+			strcat(all, bd->data);
+			bd = bd->next;	
+			if(i++ > number) break;
+		}
+		if(bd != NULL) strcat(all, "1010");
+}
+
+/*
+ *	concatenate All DC and Some AC component into a string
+ */
+void Bitstream::catAllDCandSomeACcomponent(char *all, int number)
+{
+	current_block = head_block->next;//head didn't store data
+	while(current_block){
+		strcat(all, current_block->data);
+		catSomeAcComponent(current_block, all, number);
+		current_block = current_block->next;
+	}	
+}
+
+void Bitstream::writeToFileWithSomeAC(const char *outFileName, int ACnumber)
+{
+	FILE *fp;
+	allData = new char[numberOfBits];
+	*allData = '\0';
+
+	if(NULL == (fp=fopen(outFileName, "a+b")))
+		printf("Error in opening file.\n");
+
+	catAllDCandSomeACcomponent(allData, ACnumber);
+	printf("write the following data into file %s \n%s\n%ld Byte\n", outFileName, allData, strlen(allData)/8);
+	stringToBinary(allData, fp);
+
+	if(fclose(fp))
+		printf("Error in close file.\n");
+
+	delete[] allData;
 }
 
 /*
