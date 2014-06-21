@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include "bitstream.h"
 
 #define ARRAY 0
 #define BLOCK 1
@@ -22,6 +23,9 @@ public:
 	void loadJPGEimage(const char *fileName);
     void ImageDecompress(const char *BMPfileName);
     inline void verbose(int parameter);
+    inline void displayBitstream(void);
+    void progressiveDecompression(const char *BMPfileName);
+    char* loadJPGEimage(void);
 
 	JPEGimage(){
 		JpegSizeX = 0;
@@ -37,12 +41,17 @@ private:
     int **luma; //Y
 	char *bitstream_data;
 	char *bdptr; //point to the current processing position of bitstream_data
-	int JpegSizeX, JpegSizeY;
+	int JpegSizeX, JpegSizeY; // for sequential mode
+	int imageSizeY, imageSizeX; // for progressive mode 
     int verbose_t;
+
+    Bitstream storeBitstream;
 
     void printData(int type, const char *name, const void *data);
     int decodeDC(void);
+    char* decodeDC(char *bitptr);
     void decodeAC(int *zeroRL, int *ACvalue);
+    char* decodeAC(char *bitptr);
     void RLED(int ZZ[64],int RL[64]);
     void ZigZagD(int QF[8][8],int ZZ[64]);
     void QuantizeD(int F[8][8], int QF[8][8]);
@@ -51,6 +60,11 @@ private:
     void saveImage(const char *BMPfileName);
 
 };
+
+inline void JPEGimage::displayBitstream(void)
+{
+    storeBitstream.displayAll();
+}
 
 inline void JPEGimage::verbose(int parameter)
 {
@@ -132,8 +146,49 @@ int JPEGimage::decodeDC(void)
     if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
         printf("DC: %s(%d)  \n", value, DC);
     
-
     return DC;
+}
+
+/* for Progressive Mode to decode the input .Ajpg into bitstream_list
+ * the bitstram_list is will write into jpg_tmp~ file
+ */
+char* JPEGimage::decodeDC(char *bitptr)
+{
+    const int codeTotalLen[12] = {2,4,5,6,7,8,10,12,14,16,18,20};
+    const int codeLen[12] = {2, 3, 3, 3, 3, 3, 4, 5, 6, 7, 8, 9};
+    const char* code[12] = {"00","010","011","100","101","110","1110","11110","111110","1111110","11111110","111111110"};
+    int i = 0;
+    
+    //Find the which DC code is
+    for(i = 0; i < 12 ; i++)
+    	if(strncmp(bitptr, code[i], codeLen[i]) == 0)
+    		break;
+    
+    //move pointer to point to "VALUE" of DC
+    bitptr += codeLen[i];
+    //find the length of VALUE 
+    int valueLen = codeTotalLen[i] - codeLen[i];
+    
+    //store the VALUE part of DC in value
+    char *value;
+    value = (char *) malloc(valueLen * sizeof(char) + 1);
+    value = strncpy(value, bitptr, valueLen);
+    value[valueLen] = '\0';
+
+    //move ptr to next component of the bitstream
+    bitptr += valueLen;
+
+    if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
+        printf("DC: %s  \n", value);
+    
+    
+    char *DCstr = (char *)malloc(codeTotalLen[i] * sizeof(char) + 1);
+    strcpy(DCstr, code[i]);
+    strcat(DCstr, value);
+    DCstr[codeTotalLen[i]] = '\0';
+    storeBitstream.add_DC(DCstr);
+    //storeBitstream.displayAll();
+    return bitptr;
 }
 
 /*
@@ -222,6 +277,87 @@ void JPEGimage::decodeAC(int *zeroRL, int *ACvalue)
         printf("%s(%d,%d)\n", value, *zeroRL,*ACvalue);
 
 }
+
+/*
+ * for Progressive Mode
+ */
+char* JPEGimage::decodeAC(char *bitptr)
+{
+	int codeLen[16][11] = {
+	    {4 ,3 ,4 ,6 ,8 ,10,12,14,18,25,26},
+	    {0 ,5 ,8 ,10,13,16,22,23,24,25,26},
+	    {0 ,6 ,10,13,20,21,22,23,24,25,26},
+	    {0 ,7 ,11,14,20,21,22,23,24,25,26},
+	    {0 ,7 ,12,19,20,21,22,23,24,25,26},
+	    {0 ,8 ,12,19,20,21,22,23,24,25,26},
+	    {0 ,8 ,13,19,20,21,22,23,24,25,26},
+	    {0 ,9 ,13,19,20,21,22,23,24,25,26},
+	    {0 ,9 ,17,19,20,21,22,23,24,25,26},
+	    {0 ,10,18,19,20,21,22,23,24,25,26},
+	    {0 ,10,18,19,20,21,22,23,24,25,26},
+	    {0 ,10,18,19,20,21,22,23,24,25,26},
+	    {0 ,11,18,19,20,21,22,23,24,25,26},
+	    {0 ,12,18,19,20,21,22,23,24,25,26},
+	    {0 ,13,18,19,20,21,22,23,24,25,26},
+	    {12,17,18,19,20,21,22,23,24,25,26}
+    };
+
+    const char* code[16][11] = {
+        {"1010",  "00",  "01",  "100",  "1011",  "11010",  "111000",  "1111000",  "1111110110",  "1111111110000010",  "1111111110000011"},
+        {" ","1100","111001","1111001","111110110","11111110110","1111111110000100","1111111110000101","1111111110000110","1111111110000111","1111111110001000"},
+        {" ","11011","11111000","1111110111","1111111110001001","1111111110001010","1111111110001011","1111111110001100","1111111110001101","1111111110001110","1111111110001111"},
+        {" ","111010","111110111","11111110111","1111111110010000","1111111110010001","1111111110010010","1111111110010011","1111111110010100","1111111110010101","1111111110010110"},
+        {" ","111011","1111111000","1111111110010111","1111111110011000","1111111110011001","1111111110011010","1111111110011011","1111111110011100","1111111110011101","1111111110011110"},
+        {" ","1111010","1111111001","1111111110011111","1111111110100000","1111111110100001","1111111110100010","1111111110100011","1111111110100100","1111111110100101","1111111110100110"},
+        {" ","1111011","11111111000","1111111110100111","1111111110101000","1111111110101001","1111111110101010","1111111110101011","1111111110101100","1111111110101101","1111111110101110"},
+        {" ","11111001","11111111001","1111111110101111","1111111110110000","1111111110110001","1111111110110010","1111111110110011","1111111110110100","1111111110110101","1111111110110110"},
+        {" ","11111010","111111111000000","1111111110110111","1111111110111000","1111111110111001","1111111110111010","1111111110111011","1111111110111100","1111111110111101","1111111110111110"},
+        {" ","111111000","1111111110111111","1111111111000000","1111111111000001","1111111111000010","1111111111000011","1111111111000100","1111111111000101","1111111111000110","1111111111000111"},
+        {" ","111111001","1111111111001000","1111111111001001","1111111111001010","1111111111001011","1111111111001100","1111111111001101","1111111111001110","1111111111001111","1111111111010000"},
+        {" ","111111010","1111111111010001","1111111111010010","1111111111010011","1111111111010100","1111111111010101","1111111111010110","1111111111010111","1111111111011000","1111111111011001"},
+        {" ","1111111010","1111111111011010","1111111111011011","1111111111011100","1111111111011101","1111111111011110","1111111111011111","1111111111100000","1111111111100001","1111111111100010"},
+        {" ","11111111010","1111111111100011","1111111111100100","1111111111100101","1111111111100110","1111111111100111","1111111111101000", "1111111111101001","1111111111101010","1111111111101011"},
+        {" ","111111110110","1111111111101100","1111111111101101","1111111111101110","1111111111101111","1111111111110000","1111111111110001","1111111111110010","1111111111110011","1111111111110100"},
+        {"111111110111","1111111111110101","1111111111110110","1111111111110111","1111111111111000","1111111111111001","1111111111111010","1111111111111011","1111111111111100","1111111111111101","1111111111111110"}
+    };
+
+    if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
+        printf("AC: ");
+    
+    //find the zero Run-lenth of AC
+    int zero, size;
+    for(zero = 0; zero < 16; zero++)
+        for(size = 0; size < 11; size++)
+            if(strncmp(bitptr, code[zero][size], strlen(code[zero][size])) == 0) 
+                goto end;
+    end:
+
+    //move the point to the VALUE part
+    bitptr += strlen(code[zero][size]);
+       
+    if((verbose_t & VERBOSE_DECODE) == VERBOSE_DECODE)
+        printf("%s ", code[zero][size]);
+
+    //The below is decompose the VALUE part from bitstream
+    int valueLen = codeLen[zero][size] - strlen(code[zero][size]);
+    char *value;
+    value = (char *) malloc(valueLen * sizeof(char) + 1);
+    value = strncpy(value, bitptr, valueLen);
+    value[valueLen] = '\0';
+
+    //move the point to the next AC/DC component
+    bitptr += valueLen;    
+    
+    char *ACstr = (char *)malloc(codeLen[zero][size] * sizeof(char) + 1);
+    strcpy(ACstr, code[zero][size]);
+    strcat(ACstr, value);
+    ACstr[codeLen[zero][size]] = '\0';
+
+    storeBitstream.add_ACtoCurBlk(ACstr);
+    
+    return bitptr;
+}
+
 
 void JPEGimage::RLED(int ZZ[64],int RL[64])
 {
@@ -337,6 +473,9 @@ void JPEGimage::saveImage(const char *BMPfileName)
     image.write(BMPfileName);
 }
 
+/*
+ * For Sequential Mode
+ */
 void JPEGimage::ImageDecompress(const char *BMPfileName)
 {
     int DCval = 0;
@@ -354,7 +493,7 @@ void JPEGimage::ImageDecompress(const char *BMPfileName)
 
     for(int i = 0; i < y ; i++){
         for(int j = 0; j < x ; j++){
-            printf("\nProcessing Block (%2d, %2d) ...\n", j, i);
+            printf("Processing Block (%2d, %2d) ...\n", j, i);
 
             //reset parameter
             EOB = 0;
@@ -461,16 +600,137 @@ void JPEGimage::loadJPGEimage(const char *fileName)
     if(fp) fclose(fp);
 }
 
+/*
+ * Progressive Mode
+ */
+char* JPEGimage::loadJPGEimage(void)
+{
+	long file_size = 0;
+	FILE *fp;
+	Byte read_byte, temp_byte;
+	int i = 0, cnt = 0;
+	char *bitptr;
+
+	//open file
+	if(NULL == (fp=fopen("jpg_tmp~", "r+b"))){
+		printf("Error in opening file, mybe not exist.\n");
+		return NULL;
+	}
+
+
+    //The first 2 byte in file is the image size
+    imageSizeX = (unsigned int)getc(fp) * 8;
+    imageSizeY = (unsigned int)getc(fp) * 8;
+    printf("The Jpeg Image size is %d*%d\n", JpegSizeX, JpegSizeY);
+    
+    //allocate memory for luma
+    luma = new int*[JpegSizeY];
+    for(i=0;i<JpegSizeY;i++){
+        luma[i] = new int[JpegSizeX];
+    }
+
+	//find the size of the file 	
+	fseek(fp, 0, SEEK_END); //move position indicator(PI) to the end of file
+	file_size = ftell(fp);
+	fseek(fp, 2, SEEK_SET); //move PI back to the start of the file
+	printf("File \"%s\" open success, the size is %ld byte\n", "jpg_tmp~", file_size);
+    file_size -= 2; //ignore the first 2 byte(represent for # of blocks)    
+
+	//allocate memory for the string to contain read bitstream
+	bitptr = (char *) malloc((file_size * 8 * sizeof(char)) + 1);
+    
+	//translate the binary to store in string(ex: 0xf0 -> "11110000")
+	while(!feof(fp)){
+		read_byte = getc(fp);
+		for(i = 7; i >= 0; i--){
+			temp_byte = read_byte & 0x01; //mask the bit other than LSB
+			bitptr[cnt*8 + i] = (temp_byte == 0x01)?'1':'0';			
+			read_byte = read_byte >> 1;
+		}
+		cnt++;
+	}
+
+	bitptr[file_size*8] = '\0'; 
+
+    if((verbose_t & VERBOSE_BITSTREAM) == VERBOSE_BITSTREAM)
+	   printf("The file content is \n%s\n", bitptr);
+	
+    if(fp) fclose(fp);
+
+    return bitptr;
+}
+
+void JPEGimage::progressiveDecompression(const char *BMPfileName)
+{
+	char *bitptr;
+    //int x = JpegSizeX / 8;
+    //int y = JpegSizeY / 8;
+    int flag = 0;
+    FILE *fp;
+
+    if((fp = fopen("jpg_tmp~", "r+b")) == NULL){
+        //Store DC in linked list Bitstream
+        loadJPGEimage("out.AjpgDC");
+
+        if(NULL == (fp=fopen("jpg_tmp~", "w+b"))) printf("Error in opening file.\n");
+        Byte xx = JpegSizeX / 8;
+        putc(xx, fp);
+        xx = JpegSizeY / 8;
+        putc(xx, fp);
+        fclose(fp);
+    	
+    	flag = 1;	
+        printf("%s\n",bdptr);
+    }else{
+    	bitptr = loadJPGEimage();
+    	flag = 0;
+        printf("%s\n",bitptr);
+    }
+
+    
+
+  	//int i = 0;
+    if(flag){
+    	while(*bdptr != '\0')bdptr = decodeDC(bdptr);//load DC into bitstream linked list
+    }else
+    	//while(*(bitptr = decodeAC(bitptr))!= '\0');
+        while(*bitptr != '\0')bitptr = decodeDC(bitptr);//load DC into bitstream linked list
+        
+    
+    //recode the currently read data
+    storeBitstream.writeToFileInBinary("jpg_tmp~");
+    loadJPGEimage("jpg_tmp~");
+    ImageDecompress(BMPfileName);
+}
+
 int main(void)
 {
 	JPEGimage jj;
 
     //jj.verbose(VERBOSE_BITSTREAM | VERBOSE_DECODE | VERBOSE_DECOMPRESS | VERBOSE_BLOCKS_MERGE);
-	jj.loadJPGEimage("out.Ajpg");
-    jj.ImageDecompress("result.bmp");
+    //jj.progressiveDecompression("result_p.bmp");
 	
+    jj.loadJPGEimage("out.Ajpg");
+    jj.ImageDecompress("result.bmp");
     jj.loadJPGEimage("out.AjpgDC");
     jj.ImageDecompress("resultDC.bmp");
+    
+    char *name, *nameBMP;
+    name = (char *)malloc(strlen("out.AjpgAC") + 1);
+    nameBMP = (char *)malloc(strlen("resultAC") + 5);
+    strcpy(name, "out.AjpgAC");
+    strcpy(nameBMP, "resultAC");
+    for(int q = 0; q<=9; q++){
+        name[strlen("out.AjpgAC")] = (char)('0' + q);
+        name[strlen("out.AjpgAC")+1] = '\0';
+        nameBMP[strlen("resultAC")] = (char)('0' + q);
+        nameBMP[strlen("resultAC")+1] = '\0';
+        printf("%s, %s", name, nameBMP);
+        strcat(nameBMP,".bmp");
+        jj.loadJPGEimage(name);
+        jj.ImageDecompress(nameBMP);
+    }
 
+    
 	return 0;
 }

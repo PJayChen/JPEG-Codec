@@ -307,7 +307,7 @@ void Bitstream::catSomeAcComponent(bitstream_data *bd, char *all, int number)
 		while(bd){
 			strcat(all, bd->data);
 			bd = bd->next;	
-			if(i++ > number) break;
+			if(i++ >= number) break;
 		}
 		if(bd != NULL) strcat(all, "1010");
 }

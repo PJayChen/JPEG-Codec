@@ -238,7 +238,7 @@ void JPEGimage::ImageCompress(const char* outFileName)
   outputBitstream.writeToFileOnlyDC(fileNameOnlyDC);
   
   //write with some AC into file
-  for(char q = 1; q < 7; q++){
+  for(char q = 0; q <= 9; q++){
     char *fileNameSomeAC = (char *)malloc(strlen(outFileName) * sizeof(char) + 4);
     strcpy(fileNameSomeAC, outFileName);
     strcat(fileNameSomeAC, "AC");
@@ -328,15 +328,15 @@ void JPEGimage::DCT(const int f[][8],int F[8][8])
 void JPEGimage::Quantize(int F[8][8], int QF[8][8])
 {
   int q[8][8] = {
-  		 {16,11,10,16,24,40,51,61},
-		 {12,12,14,19,26,58,60,55},
-		 {14,13,16,24,40,57,69,56},
-		 {14,17,22,29,51,87,80,62},
-		 {18,22,37,56,68,109,103,77},
-		 {24,35,55,64,81,104,113,92},
-		 {49,64,78,87,103,121,120,101},
-		 {72,92,95,98,112,100,103,99} 
-		};
+    		{16,11,10,16,24,40,51,61},
+  		  {12,12,14,19,26,58,60,55},
+  		  {14,13,16,24,40,57,69,56},
+  		  {14,17,22,29,51,87,80,62},
+  		  {18,22,37,56,68,109,103,77},
+  		  {24,35,55,64,81,104,113,92},
+  		  {49,64,78,87,103,121,120,101},
+  		  {72,92,95,98,112,100,103,99} 
+		  };
   int i,j;
   for(i=0;i<8;i++)
     for(j=0;j<8;j++){
@@ -496,7 +496,8 @@ int JPEGimage::getCat(int a)
 void JPEGimage::getDCcode(int a,int& lenb,char *size_value)
 {
   int codeLen[12] = {2,4,5,6,7,8,10,12,14,16,18,20};
-  const char* code[12] = {"00","010","011","100","101","110","1110","11110","111110","1111110","11111110","111111110"};
+  const char* code[12] = {"00","010","011","100","101","110","1110",
+                          "11110","111110","1111110","11111110","111111110"};
   int cat = getCat(a); //get SIZE of DC
   lenb = codeLen[cat]; //pick out the Code length by SIZE. the name SIZE is according to Image Compression JPGE.pdf
   strcpy(size_value,code[cat]);
